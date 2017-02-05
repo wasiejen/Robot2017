@@ -16,7 +16,7 @@ class RobotController(Thread):
     _ANGLE_PER_ROTATION = 5.625 / 64
     _STEPS_PER_ROTATION = 4096
 
-    _STEP_SIZE = 50
+    _STEP_SIZE = 16
 
     _TIME_BETWEEN_STEPS = 1.3  # ms
     _MIN_DISTANCE = 150  # mm
@@ -95,7 +95,7 @@ class RobotController(Thread):
 
         def moveScan():
             while not self._motorQueue.empty():
-                distance = self.scanArray([scanDirection], returnSensorId=scanDirection)
+                distance = self.scanArray(returnSensorId=scanDirection)
                 if distance < self._MIN_DISTANCE:
                     self._motorQueue.clear()
                     self._saveResult([scanDirection, distance])
@@ -136,13 +136,13 @@ class RobotController(Thread):
         self._motorright.setStepDirection(right)
 
 
+    def scanArray(self, scanDirections="all", returnSensorId=None):
 
-
-
-    def scanArray(self, scanDirections, returnSensorId=None):
+        if scanDirections == "all":
+            scanDirections = ["front", "back", "left", "right"]
 
         def measureSensor(self, scanDirection):
-            distance = self._sensors[scanDirection].getData(timeout=0.1,
+            distance = self._sensors[scanDirection].getData(timeout=0.2,
                                                             withTriggerImpuls=False)
             return (scanDirection, distance)
 
@@ -153,7 +153,7 @@ class RobotController(Thread):
 
         threadList = []
 
-        for i in range(6):
+        for i in range(5):
             threadList.clear()
 
             for direction in scanDirections:
@@ -175,9 +175,9 @@ class RobotController(Thread):
                     resultDict[direction].append(2550)
                 else:
                     resultDict[direction].append(distance)
-            time.sleep(0.06)
+            time.sleep(0.10)
 
-        print(resultDict)
+        # print(resultDict)
 
         # sort out the biggest differences between mean and actual value
         # until a certain treshold of std deviation is unterschritten

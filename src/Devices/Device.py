@@ -97,12 +97,12 @@ class UltraSonicSensor(ExternalSensor):
             pulseStart = time.time()
             if pulseStart - starttime > timeout:
                 return 0
-            time.sleep(0.00015)
+            time.sleep(0.00005)
         while (GPIO.input(self.answerPin) == True):
             pulseEnd = time.time()
             if pulseEnd - starttime > timeout:
                 return 0
-            time.sleep(0.00015)
+            time.sleep(0.00005)
         return pulseEnd - pulseStart
 
     def _calculateDistanceInMM(self, duration):

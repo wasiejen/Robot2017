@@ -73,8 +73,7 @@ class UltraSonicSensor(ExternalSensor):
     def getdata(self, timeout=1):
         self.sendTriggerImpuls()
         duration = self.measureTime(timeout)
-        distance = self._calculateDistanceInMM(duration)
-        return distance
+        return self._calculateDistanceInMM(duration)
 
     def sendTriggerImpuls(self):
         # 10 us impuls starts 8 bursts at 40 kHz

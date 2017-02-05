@@ -1,5 +1,6 @@
 from threading import Thread
 import math
+import time
 
 
 class Stopped(Exception):
@@ -8,12 +9,15 @@ class Stopped(Exception):
 
 class RobotController(Thread):
 
-    _diameterWheel = 63.75
-    _distanceWheels = 131
-    _anglePerStep = 5.625 / 64
-    _stepsPerRotation = 4096
+    _WHEEL_DIAMETER = 63.75 # mm
+    _DISTANCE_BETWEEN_WHEELS = 131 # mm
+    _ANGLE_PER_ROTATION = 5.625 / 64
+    _STEPS_PER_ROTATION = 4096
 
-    _stepSize = 10
+    _STEP_SIZE = 10
+
+    _TIME_BETWEEN_STEPS = 1.5 # ms
+    _MIN_DISTANCE = 100  # mm
 
     def __init__(self, driveInstructions, motorQueue, actors, sensors, results):
         Thread.__init__(self)
@@ -32,15 +36,19 @@ class RobotController(Thread):
             if commandIdentifier == "move":
                 if value > 0:
                     self.setDirectionLF(1, 1)
+                    scanDirection = "front"
                 else:
                     self.setDirectionLF(-1, -1)
+                    scanDirection = "back"
                 steps = self.getStepsForCM(abs(value))
 
             elif commandIdentifier == "turn":
                 if value > 0:
                     self.setDirectionLF(-1, 1)
+                    scanDirection = "right"
                 else:
                     self.setDirectionLF(1, -1)
+                    scanDirection = "left"
                 steps = self.getStepsForAngle(abs(value))
 
             elif commandIdentifier == "stopThread":
@@ -49,12 +57,15 @@ class RobotController(Thread):
 
             # filling the motorQueue with cycles of steps
             self._motorQueue.clear()
-            cycles = [self._stepSize] * int(steps / self._stepSize)
-            cycles.append(steps % self._stepSize)  # append rest
+            cycles = [self._STEP_SIZE] * int(steps / self._STEP_SIZE)
+            cycles.append(steps % self._STEP_SIZE)  # append rest
+
             for cycle in cycles:
                 self._motorQueue.put_nowait(cycle)
 
-            movedSteps = self.move(self._motorQueue, waitTime=1.5)
+            movedSteps = self.moveAndScan(scanDirection)
+
+            print("Robot: ", [commandIdentifier, movedSteps])
 
             self._results.put([commandIdentifier, movedSteps])
 
@@ -63,19 +74,31 @@ class RobotController(Thread):
 
 
     def getStepsForCM(self, value):
-        result = value / (math.pi * self._diameterWheel / self._stepsPerRotation)
+        result = value / (math.pi * self._WHEEL_DIAMETER / self._STEPS_PER_ROTATION)
         return int(result)
 
     def getStepsForAngle(self, value):
-        result = value * (math.pi * self._distanceWheels / 360) / (math.pi * self._diameterWheel / self._stepsPerRotation)
+        result = value * (math.pi * self._DISTANCE_BETWEEN_WHEELS / 360) / (math.pi * self._WHEEL_DIAMETER / self._STEPS_PER_ROTATION)
         return int(result)
 
-    def move(self, queue, waitTime):
+    def moveAndScan(self, scanDirection):
+        def moveScan():
+            while not self._motorQueue.empty():
+                if self._sensors[scanDirection].getdata() < self._MIN_DISTANCE:
+                    self._motorQueue.clear()
+                    break
+                time.sleep(0.25)
+        Thread(target=moveScan, name="moveScan").start()
+        return self.move()
+
+
+
+    def move(self):
         movedSteps = 0
-        while not queue.empty:
-            steps = queue.get()
-            tLeft = Thread(target=self._moveLeftMotor, name="tLeft", args=(steps, waitTime))
-            tRight = Thread(target=self._moveRightMotor, name="tRight", args=(steps, waitTime))
+        while not self._motorQueue.empty():
+            steps = self._motorQueue.get()
+            tLeft = Thread(target=self._moveLeftMotor, name="tLeft", args=(steps, self._TIME_BETWEEN_STEPS))
+            tRight = Thread(target=self._moveRightMotor, name="tRight", args=(steps, self._TIME_BETWEEN_STEPS))
             tLeft.start()
             tRight.start()
             tLeft.join()

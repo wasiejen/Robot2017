@@ -1,9 +1,9 @@
+# import Devices.DeviceStup as Device
+import Devices.Device as Device
 from queue import Queue
 import time
 
 import RobotController
-
-import src.Devices.DeviceStup as Device
 
 
 class ClearableQueue(Queue):
@@ -22,10 +22,10 @@ class Robot(object):
         self.driveInstructions = ClearableQueue()
         self.motorQueue = ClearableQueue()
 
-        self.sensors = {"USFront": Device.UltraSonicSensor(27, 23),
-                        "USRight": Device.UltraSonicSensor(27, 15),
-                        "USLeft": Device.UltraSonicSensor(27, 17),
-                        "USBAck": Device.UltraSonicSensor(27, 18),
+        self.sensors = {"front": Device.UltraSonicSensor(27, 23),
+                        "right": Device.UltraSonicSensor(27, 15),
+                        "left": Device.UltraSonicSensor(27, 17),
+                        "back": Device.UltraSonicSensor(27, 18),
                         "RaspiLED": Device.RaspiLED()}
 
         self.results = Queue()

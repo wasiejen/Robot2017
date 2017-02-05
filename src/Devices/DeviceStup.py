@@ -4,6 +4,7 @@
 
 #import RPi.GPIO as GPIO
 import time
+import random
 
 # Needs to be BCM. GPIO.BOARD lets you address GPIO ports by periperal
 # connector pin number, and the LED GPIO isn't on the connector
@@ -53,7 +54,7 @@ class ExternalSensor(ExternalDevice):
         self._pins = pins
         self._name = "ExternalSensor"
 
-    def getdata(self):
+    def getData(self):
         raise NotImplementedError("Please Implement this method: getdata")
 
 
@@ -71,8 +72,9 @@ class UltraSonicSensor(ExternalSensor):
 
         self._name = "UltraSonicSensor"
 
-    def getdata(self, timeout=1):
-        self.sendTriggerImpuls()
+    def getData(self, timeout=1, withTriggerImpuls=True):
+        if withTriggerImpuls:
+            self.sendTriggerImpuls()
         duration = self.measureTime(timeout)
         distance = self._calculateDistanceInMM(duration)
         return distance
@@ -80,17 +82,18 @@ class UltraSonicSensor(ExternalSensor):
     def sendTriggerImpuls(self):
         # 10 us impuls starts 8 bursts at 40 kHz
         # GPIO.output(self.triggerPin, True)
-        time.sleep(0.2)
+        time.sleep(0.01)
         # GPIO.output(self.triggerPin, False)
 
     def measureTime(self, timeout):
 
-        return 0.5
+        return 0.1
 
     def _calculateDistanceInMM(self, duration):
         # speed of sound at sealevel 343000 mm/s
         # distance = duration / 2 * speed
-        return 150
+        distance = random.random() * 1000 + 130
+        return distance
 
 class Gyroskop(ExternalSensor):
 

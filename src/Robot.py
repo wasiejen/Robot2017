@@ -1,5 +1,5 @@
-# import Devices.DeviceStup as Device
-import Devices.Device as Device
+import Devices.DeviceStup as Device
+# import Devices.Device as Device
 from queue import Queue
 import time
 
@@ -41,12 +41,19 @@ class Robot(object):
 
 
     def start(self):
-        self.driveInstructions.put(["move", 100])
-        self.driveInstructions.put(["move", -100])
-        self.driveInstructions.put(["turn", 90])
-        self.driveInstructions.put(["turn", -90])
+        self.driveInstructions.put(["scanArray", 0])
+        self.driveInstructions.put(["scanArray", 0])
+        #  self.driveInstructions.put(["move", 100])
+        # self.driveInstructions.put(["move", -100])
+        # self.driveInstructions.put(["turn", 90])
+        # self.driveInstructions.put(["turn", -90])
+
+        self.driveInstructions.put(["stopThread", 0])
 
         self.robotController.start()
+        # self.robotController.scanArray("front")
+        # time.sleep(5)
+        # self.robotController.scanArray("back")
 
     def put(self, commandIdentifier, value):
         self.driveInstructions.put([commandIdentifier, value])
@@ -73,5 +80,28 @@ if __name__ == "__main__":
 
     robot = Robot()
     robot.start()
-    time.sleep(5)
-    robot.printResults()
+
+    # start = time.time()
+    # while time.time() - start < 50:
+    #     print(robot.sensors["front"].getData())
+    #     time.sleep(0.25)
+    #
+    # start = time.time()
+    # while time.time() - start < 50:
+    #     print(robot.sensors["back"].getData())
+    #     time.sleep(0.25)
+    #
+    # start = time.time()
+    # while time.time() - start < 50:
+    #     print(robot.sensors["left"].getData())
+    #     time.sleep(0.25)
+    #
+    # start = time.time()
+    # while time.time() - start < 50:
+    #     print(robot.sensors["right"].getData())
+    #     time.sleep(0.25)
+
+
+
+    # time.sleep(5)
+    # robot.printResults()

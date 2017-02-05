@@ -33,7 +33,7 @@ motorThread.start()
 # motorright.move(1000,3)
 
 print(ultraSonic1)
-print("front: detected Distance in mm: ", ultraSonic1.getdata())
+print("front: detected Distance in mm: ", ultraSonic1.getData())
 time.sleep(1)
 # print(ultraSonic2)
 # print("right: detected Distance in mm: ", ultraSonic2.getdata())

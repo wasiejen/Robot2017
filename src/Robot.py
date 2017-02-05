@@ -26,6 +26,7 @@ class Robot(object):
                         "right": Device.UltraSonicSensor(27, 15),
                         "left": Device.UltraSonicSensor(27, 17),
                         "back": Device.UltraSonicSensor(27, 18),
+                        "extern": Device.UltraSonicSensor(2, 3),
                         "RaspiLED": Device.RaspiLED()}
 
         self.results = Queue()
@@ -35,62 +36,31 @@ class Robot(object):
                                                                self.actors,
                                                                self.sensors,
                                                                self.results)
-    #   TODO: Position actualisation
+    #   TODO: Position actualisation -> Aufgabe PC
+    #   TODO: DIODEN als Fehlerquelle identifiziert -> umloeten!!!
+    #
 
 
     def start(self):
-        self.driveInstructions.put(["scanArray", "all"])
-        self.driveInstructions.put(["scanArray", "all"])
-        self.driveInstructions.put(["move", 10000])
-        self.driveInstructions.put(["turn", -90])
-        self.driveInstructions.put(["move", 10000])
-        self.driveInstructions.put(["turn", -90])
-        self.driveInstructions.put(["move", 10000])
-        self.driveInstructions.put(["turn", -90])
-        self.driveInstructions.put(["move", 10000])
-        self.driveInstructions.put(["turn", -90])
-        self.driveInstructions.put(["move", 10000])
-        self.driveInstructions.put(["turn", -90])
-        self.driveInstructions.put(["move", 10000])
-        self.driveInstructions.put(["turn", -90])
-        self.driveInstructions.put(["move", 10000])
-        self.driveInstructions.put(["turn", -90])
-        self.driveInstructions.put(["move", 10000])
-        self.driveInstructions.put(["turn", -90])
-        self.driveInstructions.put(["move", 10000])
-        self.driveInstructions.put(["turn", -90])
-        self.driveInstructions.put(["move", 10000])
-        self.driveInstructions.put(["turn", -90])
-        self.driveInstructions.put(["move", 10000])
-        self.driveInstructions.put(["turn", -90])
-        self.driveInstructions.put(["move", 10000])
-        self.driveInstructions.put(["turn", -90])
-        self.driveInstructions.put(["move", 10000])
-        self.driveInstructions.put(["turn", -90])
-        self.driveInstructions.put(["move", 10000])
-        self.driveInstructions.put(["turn", -90])
-        self.driveInstructions.put(["move", 10000])
-        self.driveInstructions.put(["turn", -90])
-        self.driveInstructions.put(["move", 10000])
-        self.driveInstructions.put(["turn", -90])
-        self.driveInstructions.put(["move", 10000])
-        self.driveInstructions.put(["turn", -90])
-        self.driveInstructions.put(["move", 10000])
-        self.driveInstructions.put(["turn", -90])
-        self.driveInstructions.put(["move", 10000])
-        self.driveInstructions.put(["turn", -90])
-        self.driveInstructions.put(["move", 10000])
-        self.driveInstructions.put(["turn", -90])
-        self.driveInstructions.put(["move", 10000])
-        self.driveInstructions.put(["turn", -90])
-        self.driveInstructions.put(["move", 10000])
-        self.driveInstructions.put(["turn", -90])
-        self.driveInstructions.put(["move", 10000])
-        self.driveInstructions.put(["turn", -90])
-        self.driveInstructions.put(["move", 10000])
-        self.driveInstructions.put(["turn", -90])
 
-        self.driveInstructions.put(["turn", -90])
+
+        start = time.time()
+
+        while time.time() - start < 50:
+            print(self.sensors["extern"].getData())
+            time.sleep(0.1)
+
+
+        self.driveInstructions.put(["scanArray", ["extern"]])
+        self.driveInstructions.put(["scanArray", ["extern"]])
+        self.driveInstructions.put(["scanArray", ["extern"]])
+        self.driveInstructions.put(["scanArray", ["extern"]])
+        self.driveInstructions.put(["scanArray", ["extern"]])
+
+        # self.driveInstructions.put(["move", 10000])
+        # self.driveInstructions.put(["turn", -90])
+
+        # self.driveInstructions.put(["turn", -90])
 
         self.driveInstructions.put(["stopThread", 0])
 

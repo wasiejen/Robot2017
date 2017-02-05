@@ -162,10 +162,10 @@ class RobotController(Thread):
                                                    args=(self, direction)))
             for thread in threadList:
                 thread.start()
-            self._sensors["front"].startTrigger()
-            time.sleep(0.00001)
-            self._sensors["front"].stopTrigger()
-            # self._sensors["front"].sendTriggerImpuls()
+            # self._sensors["front"].startTrigger()
+            # time.sleep(0.00001)
+            # self._sensors["front"].stopTrigger()
+            self._sensors[scanDirections[0]].sendTriggerImpuls()
 
             for thread in threadList:
                 direction, distance = thread.join()
@@ -175,7 +175,7 @@ class RobotController(Thread):
                     resultDict[direction].append(2550)
                 else:
                     resultDict[direction].append(distance)
-            time.sleep(0.10)
+            #time.sleep(0.02)
 
         # print(resultDict)
 

@@ -70,7 +70,7 @@ class UltraSonicSensor(ExternalSensor):
 
         self._name = "UltraSonicSensor"
 
-    def getData(self, timeout=0.5, withTriggerImpuls=True):
+    def getData(self, timeout=0.30, withTriggerImpuls=True):
         if withTriggerImpuls:
             self.sendTriggerImpuls()
         duration = self.measureTime(timeout)
@@ -97,12 +97,12 @@ class UltraSonicSensor(ExternalSensor):
             pulseStart = time.time()
             if pulseStart - starttime > timeout:
                 return 0
-            time.sleep(0.00005)
+            time.sleep(0.000005)
         while (GPIO.input(self.answerPin) == True):
             pulseEnd = time.time()
             if pulseEnd - starttime > timeout:
                 return 0
-            time.sleep(0.00005)
+            time.sleep(0.000005)
         return pulseEnd - pulseStart
 
     def _calculateDistanceInMM(self, duration):

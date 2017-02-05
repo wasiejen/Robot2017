@@ -1,4 +1,4 @@
-import queue
+from queue import Queue
 import time
 
 import RobotController
@@ -6,27 +6,35 @@ import RobotController
 import src.Devices.DeviceStup as Device
 
 
+class ClearableQueue(Queue):
+
+    def clear(self):
+        self.queue.clear()
+
+
 class Robot(object):
 
     def __init__(self):
-        self.motorleft = Device.StepperMotor([24, 7, 25, 8], True)
-        self.motorright = Device.StepperMotor([22, 10, 9, 11], False)
 
-        self.driveInstructions = queue.Queue()
+        self.actors = {"mleft": Device.StepperMotor([24, 7, 25, 8], True),
+                       "mright": Device.StepperMotor([22, 10, 9, 11], False)}
 
-        self.results = queue.Queue()
+        self.driveInstructions = ClearableQueue()
+        self.motorQueue = ClearableQueue()
 
-        self.motorController = RobotController.RobotController(self.driveInstructions,
-                                                               self.motorleft,
-                                                               self.motorright,
+        self.sensors = {"USFront": Device.UltraSonicSensor(27, 23),
+                        "USRight": Device.UltraSonicSensor(27, 15),
+                        "USLeft": Device.UltraSonicSensor(27, 17),
+                        "USBAck": Device.UltraSonicSensor(27, 18),
+                        "RaspiLED": Device.RaspiLED()}
+
+        self.results = Queue()
+
+        self.robotController = RobotController.RobotController(self.driveInstructions,
+                                                               self.motorQueue,
+                                                               self.actors,
+                                                               self.sensors,
                                                                self.results)
-
-        self.ultraSonicFront = Device.UltraSonicSensor(27, 23)
-        self.ultraSonicRight = Device.UltraSonicSensor(27, 15)
-        self.ultraSonicLeft = Device.UltraSonicSensor(27, 17)
-        self.ultraSonicBack = Device.UltraSonicSensor(27, 18)
-
-        self.led = Device.RaspiLED()
 
     #   TODO: THread for USS Array :-D
     #   TODO: Position actualisation
@@ -38,7 +46,7 @@ class Robot(object):
         self.driveInstructions.put(["turn", 90])
         self.driveInstructions.put(["turn", -90])
 
-        self.motorController.start()
+        self.robotController.start()
 
     def put(self, commandIdentifier, value):
         self.driveInstructions.put([commandIdentifier, value])

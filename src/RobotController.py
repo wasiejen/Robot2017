@@ -16,10 +16,10 @@ class RobotController(Thread):
     _ANGLE_PER_ROTATION = 5.625 / 64
     _STEPS_PER_ROTATION = 4096
 
-    _STEP_SIZE = 32
+    _STEP_SIZE = 50
 
-    _TIME_BETWEEN_STEPS = 1.5  # ms
-    _MIN_DISTANCE = 80  # mm
+    _TIME_BETWEEN_STEPS = 1.3  # ms
+    _MIN_DISTANCE = 150  # mm
 
     def __init__(self, driveInstructions, motorQueue, actors, sensors, results):
         Thread.__init__(self)
@@ -59,7 +59,7 @@ class RobotController(Thread):
                 raise Stopped
 
             elif commandIdentifier == "scanArray":
-                self.scanArray("front", "back", "left", "right")
+                self.scanArray(value)
                 continue
 
             # filling the motorQueue with cycles of steps
@@ -73,6 +73,7 @@ class RobotController(Thread):
             movedSteps = self.moveAndScan(scanDirection)
 
             self._saveResult([commandIdentifier, movedSteps])
+            time.sleep(0.2)
 
     def getNextInstruction(self):
         return self._driveInstructions.get()
@@ -94,10 +95,10 @@ class RobotController(Thread):
 
         def moveScan():
             while not self._motorQueue.empty():
-                distance = self.scanArray(scanDirection, returnSensorId=scanDirection)
+                distance = self.scanArray([scanDirection], returnSensorId=scanDirection)
                 if distance < self._MIN_DISTANCE:
                     self._motorQueue.clear()
-                    self._saveResult(["scan", scanDirection, distance])
+                    self._saveResult([scanDirection, distance])
                     break
                 time.sleep(0.25)
 
@@ -138,28 +139,21 @@ class RobotController(Thread):
 
 
 
-    def scanArray(self, *scanDirections, returnSensorId=None):
+    def scanArray(self, scanDirections, returnSensorId=None):
 
         def measureSensor(self, scanDirection):
             distance = self._sensors[scanDirection].getData(timeout=0.1,
                                                             withTriggerImpuls=False)
             return (scanDirection, distance)
-            # print(scanDirection, distance)
-            # dict.append(distance)
-            # resultQueue.put([scanDirection, distance])
-        # dict = {}
-        # for direction in scanDirections:
-        #     dict[direction] = []
 
         resultDict = {}
 
         for direction in scanDirections:
             resultDict[direction] = []
 
-        # resultQueue = QueueThread()
         threadList = []
 
-        for i in range(5):
+        for i in range(6):
             threadList.clear()
 
             for direction in scanDirections:
@@ -169,23 +163,19 @@ class RobotController(Thread):
             for thread in threadList:
                 thread.start()
             self._sensors["front"].startTrigger()
-            time.sleep(0.00003)
+            time.sleep(0.00001)
             self._sensors["front"].stopTrigger()
             # self._sensors["front"].sendTriggerImpuls()
 
             for thread in threadList:
-                dir, distance = thread.join()
-                resultDict[dir].append(distance)
-            time.sleep(0.04)
-
-        # save entries in a dict to sort them according to sensor source
-        # pair of scandirection and distancevalue
-
-
-        # while not resultQueue.empty():
-        #     entry = resultQueue.get()
-        #     if not entry[1] == 0:
-        #         resultDict[entry[0]].append(entry[1])
+                direction, distance = thread.join()
+                if distance <= 0:
+                    resultDict[direction].append(100)
+                elif distance > 2550:
+                    resultDict[direction].append(2550)
+                else:
+                    resultDict[direction].append(distance)
+            time.sleep(0.06)
 
         print(resultDict)
 

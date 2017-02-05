@@ -39,12 +39,13 @@ class Robot(object):
 
 
     def start(self):
-        self.driveInstructions.put(["scanArray", 0])
-        self.driveInstructions.put(["scanArray", 0])
-        self.driveInstructions.put(["move", 100])
-        # self.driveInstructions.put(["move", -100])
-        # self.driveInstructions.put(["turn", 90])
-        # self.driveInstructions.put(["turn", -90])
+        self.driveInstructions.put(["scanArray", ["front", "back", "left", "right"]])
+        self.driveInstructions.put(["scanArray", ["front", "back", "left", "right"]])
+        self.driveInstructions.put(["move", 1000])
+        self.driveInstructions.put(["turn", 180])
+        self.driveInstructions.put(["move", 1000])
+        self.driveInstructions.put(["turn", 90])
+        self.driveInstructions.put(["turn", -90])
 
         self.driveInstructions.put(["stopThread", 0])
 

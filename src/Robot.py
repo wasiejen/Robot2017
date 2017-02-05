@@ -1,5 +1,5 @@
-import Devices.DeviceStup as Device
-# import Devices.Device as Device
+# import Devices.DeviceStup as Device
+import Devices.Device as Device
 from queue import Queue
 import time
 
@@ -35,15 +35,13 @@ class Robot(object):
                                                                self.actors,
                                                                self.sensors,
                                                                self.results)
-
-    #   TODO: THread for USS Array :-D
     #   TODO: Position actualisation
 
 
     def start(self):
         self.driveInstructions.put(["scanArray", 0])
         self.driveInstructions.put(["scanArray", 0])
-        #  self.driveInstructions.put(["move", 100])
+        self.driveInstructions.put(["move", 100])
         # self.driveInstructions.put(["move", -100])
         # self.driveInstructions.put(["turn", 90])
         # self.driveInstructions.put(["turn", -90])

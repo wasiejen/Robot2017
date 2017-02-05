@@ -70,36 +70,49 @@ class UltraSonicSensor(ExternalSensor):
 
         self._name = "UltraSonicSensor"
 
-    def getData(self, timeout=1, withTriggerImpuls=True):
+    def getData(self, timeout=0.5, withTriggerImpuls=True):
         if withTriggerImpuls:
             self.sendTriggerImpuls()
         duration = self.measureTime(timeout)
         return self._calculateDistanceInMM(duration)
 
-
     def sendTriggerImpuls(self):
         # 10 us impuls starts 8 bursts at 40 kHz
-        GPIO.output(self.triggerPin, True)
+        self.startTrigger()
         time.sleep(0.00001)
+        self.stopTrigger()
+
+    def startTrigger(self):
+        GPIO.output(self.triggerPin, True)
+
+    def stopTrigger(self):
         GPIO.output(self.triggerPin, False)
 
     def measureTime(self, timeout):
         pulseStart = 0
         pulseEnd = 0
+        starttime = time.time()
+
         while (GPIO.input(self.answerPin) == False):
             pulseStart = time.time()
+            if pulseStart - starttime > timeout:
+                return 0
+            time.sleep(0.0005)
         while (GPIO.input(self.answerPin) == True):
             pulseEnd = time.time()
+            if pulseEnd - starttime > timeout:
+                return 0
+            time.sleep(0.0005)
         return pulseEnd - pulseStart
 
     def _calculateDistanceInMM(self, duration):
         # speed of sound at sealevel 343000 mm/s
         # distance = duration / 2 * speed
         distance = 171500 * duration
-        if distance < 60 or distance > 2550:
-            return 0
-        else:
-            return distance
+        # if distance < 60 or distance > 2550:
+        #     return 0
+        # else:
+        return distance
 
 class Gyroskop(ExternalSensor):
 

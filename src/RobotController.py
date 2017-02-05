@@ -1,7 +1,7 @@
 from threading import Thread
 import math
 import time
-import numpy
+# import numpy
 import queue
 
 
@@ -94,7 +94,7 @@ class RobotController(Thread):
 
         def moveScan():
             while not self._motorQueue.empty():
-                distance = self._sensors[scanDirection].getData()
+                distance = self.scanArray(scanDirection, returnSensorId=scanDirection)
                 if distance < self._MIN_DISTANCE:
                     self._motorQueue.clear()
                     self._saveResult(["scan", scanDirection, distance])
@@ -134,40 +134,59 @@ class RobotController(Thread):
         self._motorleft.setStepDirection(left)
         self._motorright.setStepDirection(right)
 
+
+
+
+
     def scanArray(self, *scanDirections, returnSensorId=None):
 
-        def measureSensor(scanDirection, resultQueue):
-            distance = self._sensors[scanDirection].getData(withTriggerImpuls=False)
-            print(scanDirection, distance)
-            resultQueue.put([scanDirection, distance])
+        def measureSensor(self, scanDirection):
+            distance = self._sensors[scanDirection].getData(timeout=0.1,
+                                                            withTriggerImpuls=False)
+            return (scanDirection, distance)
+            # print(scanDirection, distance)
+            # dict.append(distance)
+            # resultQueue.put([scanDirection, distance])
+        # dict = {}
+        # for direction in scanDirections:
+        #     dict[direction] = []
 
-        resultQueue = queue.Queue()
-
-        for i in range(5):
-            threadList = []
-            for direction in scanDirections:
-                threadList.append(Thread(target=measureSensor,
-                                         name=direction,
-                                         args=(direction, resultQueue)))
-            for thread in threadList:
-                thread.start()
-
-            self._sensors["front"].sendTriggerImpuls()
-
-            for thread in threadList:
-                thread.join()
-
-        # save entries in a dict to sort them according to sensor source
-        # pair of scandirection and distancevalue
         resultDict = {}
 
         for direction in scanDirections:
             resultDict[direction] = []
 
-        while not resultQueue.empty():
-            entry = resultQueue.get()
-            if not entry[1] == 0:
-                resultDict[entry[0]].append(entry[1])
+        # resultQueue = QueueThread()
+        threadList = []
+
+        for i in range(5):
+            threadList.clear()
+
+            for direction in scanDirections:
+                threadList.append(ThreadWithReturn(target=measureSensor,
+                                                   name=direction,
+                                                   args=(self, direction)))
+            for thread in threadList:
+                thread.start()
+            self._sensors["front"].startTrigger()
+            time.sleep(0.00003)
+            self._sensors["front"].stopTrigger()
+            # self._sensors["front"].sendTriggerImpuls()
+
+            for thread in threadList:
+                dir, distance = thread.join()
+                resultDict[dir].append(distance)
+            time.sleep(0.04)
+
+        # save entries in a dict to sort them according to sensor source
+        # pair of scandirection and distancevalue
+
+
+        # while not resultQueue.empty():
+        #     entry = resultQueue.get()
+        #     if not entry[1] == 0:
+        #         resultDict[entry[0]].append(entry[1])
+
         print(resultDict)
 
         # sort out the biggest differences between mean and actual value
@@ -176,17 +195,73 @@ class RobotController(Thread):
         for direction in scanDirections:
             results = resultDict[direction]
 
-            while numpy.array(results).std() > 10:
-                arr = numpy.array(results)
-                mean = numpy.mean(arr)
-                arrMean = abs(arr - mean)
-                index = arrMean.tolist().index(arrMean.max())
-                del results[index]
+            while pstdev(results) > 30 and len(results) > 2:
 
-            mean = numpy.mean(numpy.array(results))
-            resultDict[direction] = mean
-            self._saveResult([direction, mean])
+                resultMean = mean(results)
+                temp = []
+                for el in results:
+                    temp.append(abs(el - resultMean))
+                del results[temp.index(max(temp))]
+
+            resultMean = mean(results)
+            resultDict[direction] = resultMean
+            self._saveResult([direction, resultMean])
 
         # return the distance value for specific sensor if given
-        if returnSensorId:
-            return resultDict[returnSensorId][1]
+        if  returnSensorId is not None:
+            return resultDict[returnSensorId]
+
+def mean(data):
+    """Return the sample arithmetic mean of data."""
+    n = len(data)
+    if n < 1:
+        raise ValueError('mean requires at least one data point')
+    return sum(data) / n  # in Python 2 use sum(data)/float(n)
+
+def _ss(data):
+    """Return sum of square deviations of sequence data."""
+    c = mean(data)
+    ss = sum((x - c) ** 2 for x in data)
+    return ss
+
+def pstdev(data):
+    """Calculates the population standard deviation."""
+    n = len(data)
+    if n < 2:
+        raise ValueError('variance requires at least two data points')
+    ss = _ss(data)
+    pvar = ss / n  # the population variance
+    return pvar ** 0.5
+
+
+class QueueThread(Thread):
+
+    def __init__(self):
+        Thread.__init__(self)
+        self.queue = queue.Queue()
+
+    def put(self, item):
+        self.queue.put(item)
+
+    def get(self):
+        return self.queue.get()
+
+    def empty(self):
+        return self.queue.empty()
+
+
+class ThreadWithReturn(Thread):
+    def __init__(self, *args, **kwargs):
+        super(ThreadWithReturn, self).__init__(*args, **kwargs)
+
+        self._return = None
+
+    def run(self):
+        if self._target is not None:
+            self._return = self._target(*self._args, **self._kwargs)
+
+    def join(self, *args, **kwargs):
+        super(ThreadWithReturn, self).join(*args, **kwargs)
+
+        return self._return
+

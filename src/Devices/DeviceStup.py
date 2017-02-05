@@ -81,9 +81,15 @@ class UltraSonicSensor(ExternalSensor):
 
     def sendTriggerImpuls(self):
         # 10 us impuls starts 8 bursts at 40 kHz
-        # GPIO.output(self.triggerPin, True)
-        time.sleep(0.01)
-        # GPIO.output(self.triggerPin, False)
+        self.startTrigger()
+        time.sleep(0.00001)
+        self.stopTrigger()
+
+    def startTrigger(self):
+        pass
+
+    def stopTrigger(self):
+        pass
 
     def measureTime(self, timeout):
 

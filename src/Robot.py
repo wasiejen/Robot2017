@@ -26,7 +26,7 @@ class Robot(object):
                         "right": Device.UltraSonicSensor(27, 15),
                         "left": Device.UltraSonicSensor(27, 17),
                         "back": Device.UltraSonicSensor(27, 18),
-                        "extern": Device.UltraSonicSensor(2, 3),
+                        #"extern": Device.UltraSonicSensor(2, 3),
                         "RaspiLED": Device.RaspiLED()}
 
         self.results = Queue()
@@ -46,16 +46,19 @@ class Robot(object):
 
         start = time.time()
 
+        self.robotController.start()
+
         while time.time() - start < 50:
-            print(self.sensors["extern"].getData())
+            # print(self.sensors["left"].getData())
+            self.driveInstructions.put(["scanArray", "all"])
             time.sleep(0.1)
 
 
-        self.driveInstructions.put(["scanArray", ["extern"]])
-        self.driveInstructions.put(["scanArray", ["extern"]])
-        self.driveInstructions.put(["scanArray", ["extern"]])
-        self.driveInstructions.put(["scanArray", ["extern"]])
-        self.driveInstructions.put(["scanArray", ["extern"]])
+        # self.driveInstructions.put(["scanArray", ["left"]])
+        # self.driveInstructions.put(["scanArray", ["left"]])
+        # self.driveInstructions.put(["scanArray", ["left"]])
+        # self.driveInstructions.put(["scanArray", ["left"]])
+        # self.driveInstructions.put(["scanArray", ["left"]])
 
         # self.driveInstructions.put(["move", 10000])
         # self.driveInstructions.put(["turn", -90])

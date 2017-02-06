@@ -136,13 +136,13 @@ class RobotController(Thread):
         self._motorright.setStepDirection(right)
 
 
-    def scanArray(self, scanDirections="all", returnSensorId=None):
+    def scanArray(self, scanDirections, returnSensorId=None):
 
         if scanDirections == "all":
             scanDirections = ["front", "back", "left", "right"]
 
         def measureSensor(self, scanDirection):
-            distance = self._sensors[scanDirection].getData(timeout=0.2,
+            distance = self._sensors[scanDirection].getData(timeout=0.1,
                                                             withTriggerImpuls=False)
             return (scanDirection, distance)
 
@@ -165,12 +165,13 @@ class RobotController(Thread):
             # self._sensors["front"].startTrigger()
             # time.sleep(0.00001)
             # self._sensors["front"].stopTrigger()
+            time.sleep(0.005)
             self._sensors[scanDirections[0]].sendTriggerImpuls()
 
             for thread in threadList:
                 direction, distance = thread.join()
                 if distance <= 0:
-                    resultDict[direction].append(100)
+                    resultDict[direction].append(0)
                 elif distance > 2550:
                     resultDict[direction].append(2550)
                 else:

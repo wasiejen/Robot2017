@@ -50,7 +50,8 @@ class Robot(object):
 
         while time.time() - start < 50:
             # print(self.sensors["left"].getData())
-            self.driveInstructions.put(["scanArray", "all"])
+            # self.driveInstructions.put(["scanArray", "all"])
+            self.driveInstructions.put(["scanArray", ["front"]])
             time.sleep(0.1)
 
 

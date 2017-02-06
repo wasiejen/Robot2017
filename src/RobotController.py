@@ -73,7 +73,7 @@ class RobotController(Thread):
             movedSteps = self.moveAndScan(scanDirection)
 
             self._saveResult([commandIdentifier, movedSteps])
-            time.sleep(0.2)
+            time.sleep(0.1)
 
     def getNextInstruction(self):
         return self._driveInstructions.get()
@@ -138,47 +138,30 @@ class RobotController(Thread):
 
     def scanArray(self, scanDirections, returnSensorId=None):
 
+        _TIMEOUT = 0.025
+
         if scanDirections == "all":
             scanDirections = ["front", "back", "left", "right"]
-
-        def measureSensor(self, scanDirection):
-            distance = self._sensors[scanDirection].getData(timeout=0.1,
-                                                            withTriggerImpuls=False)
-            return (scanDirection, distance)
 
         resultDict = {}
 
         for direction in scanDirections:
             resultDict[direction] = []
 
-        threadList = []
+        for direction in scanDirections:
+            for i in range(10):
+                start_time = time.time()
+                distance = self._sensors[direction].getData(timeout=_TIMEOUT)
 
-        for i in range(5):
-            threadList.clear()
-
-            for direction in scanDirections:
-                threadList.append(ThreadWithReturn(target=measureSensor,
-                                                   name=direction,
-                                                   args=(self, direction)))
-            for thread in threadList:
-                thread.start()
-            # self._sensors["front"].startTrigger()
-            # time.sleep(0.00001)
-            # self._sensors["front"].stopTrigger()
-            time.sleep(0.005)
-            self._sensors[scanDirections[0]].sendTriggerImpuls()
-
-            for thread in threadList:
-                direction, distance = thread.join()
                 if distance <= 0:
                     resultDict[direction].append(0)
                 elif distance > 2550:
                     resultDict[direction].append(2550)
                 else:
                     resultDict[direction].append(distance)
-            #time.sleep(0.02)
-
-        # print(resultDict)
+                sleep_time = _TIMEOUT - (time.time() - start_time)
+                if sleep_time > 0:
+                    time.sleep(sleep_time)
 
         # sort out the biggest differences between mean and actual value
         # until a certain treshold of std deviation is unterschritten

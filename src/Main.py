@@ -1,8 +1,6 @@
-import time
+import rpyc
+
 
 if __name__ == "__main__":
 
-    robot = Robot.Robot()
-    robot.start()
-    time.sleep(5)
-    robot.printResults()
+    conn = rpyc.connect("localhost", port=1)

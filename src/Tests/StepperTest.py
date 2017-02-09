@@ -2,7 +2,7 @@ import time
 
 import RobotController
 
-from src import Devices as Device
+from src import Robot as Device
 
 motorleft = Device.StepperMotor([24, 7, 25, 8], True)
 motorright = Device.StepperMotor([22, 10, 9, 11], False)

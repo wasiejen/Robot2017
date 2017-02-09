@@ -1,7 +1,6 @@
-# import Devices.DeviceStup as Device
-import Devices.Device as Device
+import DeviceStup as Device
+# import Device as Device
 from queue import Queue
-import time
 
 import RobotController
 
@@ -22,10 +21,10 @@ class Robot(object):
         self.driveInstructions = ClearableQueue()
         self.motorQueue = ClearableQueue()
 
-        self.sensors = {"front": Device.UltraSonicSensor(27, 23),
-                        "right": Device.UltraSonicSensor(27, 15),
-                        "left": Device.UltraSonicSensor(27, 17),
-                        "back": Device.UltraSonicSensor(27, 18),
+        self.sensors = {"front": Device.UltraSonicSensor(23, 27),
+                        "right": Device.UltraSonicSensor(15, 27),
+                        "left": Device.UltraSonicSensor(17, 27),
+                        "back": Device.UltraSonicSensor(18, 27),
                         #"extern": Device.UltraSonicSensor(2, 3),
                         "RaspiLED": Device.RaspiLED()}
 
@@ -37,44 +36,33 @@ class Robot(object):
                                                                self.sensors,
                                                                self.results)
     #   TODO: Position actualisation -> Aufgabe PC
-    #   TODO: DIODEN als Fehlerquelle identifiziert -> umloeten!!!
-    #
 
 
     def start(self):
 
 
-        start = time.time()
+        # start = time.time()
 
         self.robotController.start()
 
-        while time.time() - start < 50:
+        for i in range(10):
+        # while time.time() - start < 50:
             # print(self.sensors["left"].getData())
-            # self.driveInstructions.put(["scanArray", "all"])
-            self.driveInstructions.put(["scanArray", ["front"]])
-            time.sleep(0.1)
-
+            # self.driveInstructions.put(["scan", "all"])
+            self.driveInstructions.put(["scan", ["left", "right", "front", "back"]])
 
         # self.driveInstructions.put(["scanArray", ["left"]])
-        # self.driveInstructions.put(["scanArray", ["left"]])
-        # self.driveInstructions.put(["scanArray", ["left"]])
-        # self.driveInstructions.put(["scanArray", ["left"]])
-        # self.driveInstructions.put(["scanArray", ["left"]])
-
         # self.driveInstructions.put(["move", 10000])
-        # self.driveInstructions.put(["turn", -90])
-
         # self.driveInstructions.put(["turn", -90])
 
         self.driveInstructions.put(["stopThread", 0])
 
-        self.robotController.start()
-        # self.robotController.scanArray("front")
-        # time.sleep(5)
-        # self.robotController.scanArray("back")
 
     def put(self, commandIdentifier, value):
         self.driveInstructions.put([commandIdentifier, value])
+
+    def get(self):
+        return self.results.get()
 
     def clear(self):
         self.driveInstructions.queue.clear()
@@ -85,7 +73,10 @@ class Robot(object):
     def turn(self, value):
         self.driveInstructions.put(["turn", value])
 
-    def stopThread(self):
+    def scan(self, value):
+        self.driveInstructions.put(["scan", value])
+
+    def stop(self):
         self.clear()
         self.put("stopThread", 0)
 
@@ -98,28 +89,3 @@ if __name__ == "__main__":
 
     robot = Robot()
     robot.start()
-
-    # start = time.time()
-    # while time.time() - start < 50:
-    #     print(robot.sensors["front"].getData())
-    #     time.sleep(0.25)
-    #
-    # start = time.time()
-    # while time.time() - start < 50:
-    #     print(robot.sensors["back"].getData())
-    #     time.sleep(0.25)
-    #
-    # start = time.time()
-    # while time.time() - start < 50:
-    #     print(robot.sensors["left"].getData())
-    #     time.sleep(0.25)
-    #
-    # start = time.time()
-    # while time.time() - start < 50:
-    #     print(robot.sensors["right"].getData())
-    #     time.sleep(0.25)
-
-
-
-    # time.sleep(5)
-    # robot.printResults()

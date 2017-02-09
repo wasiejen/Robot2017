@@ -1,8 +1,6 @@
 from threading import Thread
 import math
 import time
-# import numpy
-import queue
 
 
 class Stopped(Exception):
@@ -58,7 +56,7 @@ class RobotController(Thread):
                 print("MotorControllerThread stopping")
                 raise Stopped
 
-            elif commandIdentifier == "scanArray":
+            elif commandIdentifier == "scan":
                 self.scanArray(value)
                 continue
 
@@ -147,8 +145,6 @@ class RobotController(Thread):
 
         for direction in scanDirections:
             resultDict[direction] = []
-
-        for direction in scanDirections:
             for i in range(10):
                 start_time = time.time()
                 distance = self._sensors[direction].getData(timeout=_TIMEOUT)
@@ -208,34 +204,34 @@ def pstdev(data):
     return pvar ** 0.5
 
 
-class QueueThread(Thread):
+# class QueueThread(Thread):
+#
+#     def __init__(self):
+#         Thread.__init__(self)
+#         self.queue = queue.Queue()
+#
+#     def put(self, item):
+#         self.queue.put(item)
+#
+#     def get(self):
+#         return self.queue.get()
+#
+#     def empty(self):
+#         return self.queue.empty()
 
-    def __init__(self):
-        Thread.__init__(self)
-        self.queue = queue.Queue()
-
-    def put(self, item):
-        self.queue.put(item)
-
-    def get(self):
-        return self.queue.get()
-
-    def empty(self):
-        return self.queue.empty()
-
-
-class ThreadWithReturn(Thread):
-    def __init__(self, *args, **kwargs):
-        super(ThreadWithReturn, self).__init__(*args, **kwargs)
-
-        self._return = None
-
-    def run(self):
-        if self._target is not None:
-            self._return = self._target(*self._args, **self._kwargs)
-
-    def join(self, *args, **kwargs):
-        super(ThreadWithReturn, self).join(*args, **kwargs)
-
-        return self._return
+#
+# class ThreadWithReturn(Thread):
+#     def __init__(self, *args, **kwargs):
+#         super(ThreadWithReturn, self).__init__(*args, **kwargs)
+#
+#         self._return = None
+#
+#     def run(self):
+#         if self._target is not None:
+#             self._return = self._target(*self._args, **self._kwargs)
+#
+#     def join(self, *args, **kwargs):
+#         super(ThreadWithReturn, self).join(*args, **kwargs)
+#
+#         return self._return
 

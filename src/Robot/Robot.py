@@ -1,5 +1,5 @@
-import DeviceStup as Device
-# import Device as Device
+# import DeviceStup as Device
+import Device as Device
 from queue import Queue
 
 import RobotController
@@ -45,17 +45,17 @@ class Robot(object):
 
         self.robotController.start()
 
-        for i in range(10):
-        # while time.time() - start < 50:
-            # print(self.sensors["left"].getData())
-            # self.driveInstructions.put(["scan", "all"])
-            self.driveInstructions.put(["scan", ["left", "right", "front", "back"]])
-
-        # self.driveInstructions.put(["scanArray", ["left"]])
-        # self.driveInstructions.put(["move", 10000])
-        # self.driveInstructions.put(["turn", -90])
-
-        self.driveInstructions.put(["stopThread", 0])
+        # for i in range(10):
+        # # while time.time() - start < 50:
+        #     # print(self.sensors["left"].getData())
+        #     # self.driveInstructions.put(["scan", "all"])
+        #     self.driveInstructions.put(["scan", ["left", "right", "front", "back"]])
+        #
+        # # self.driveInstructions.put(["scanArray", ["left"]])
+        # # self.driveInstructions.put(["move", 10000])
+        # # self.driveInstructions.put(["turn", -90])
+        #
+        # self.driveInstructions.put(["stopThread", 0])
 
 
     def put(self, commandIdentifier, value):
@@ -65,16 +65,20 @@ class Robot(object):
         return self.results.get()
 
     def clear(self):
-        self.driveInstructions.queue.clear()
+        if not self.driveInstructions.empty():
+            self.driveInstructions.queue.clear()
 
-    def move(self, value):
-        self.driveInstructions.put(["move", value])
+    def empty(self):
+        return self.results.empty()
 
-    def turn(self, value):
-        self.driveInstructions.put(["turn", value])
-
-    def scan(self, value):
-        self.driveInstructions.put(["scan", value])
+    # def move(self, value):
+    #     self.driveInstructions.put("move", value)
+    #
+    # def turn(self, value):
+    #     self.driveInstructions.put("turn", value)
+    #
+    # def scan(self, value):
+    #     self.driveInstructions.put("scan", value)
 
     def stop(self):
         self.clear()

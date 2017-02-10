@@ -1,8 +1,12 @@
 import rpyc
 from rpyc.utils.server import ThreadedServer as Server
 from Robot import *
+import time
 
 _PORT = 1
+
+class Stopped(Exception):
+    pass
 
 class ConnectionService(rpyc.Service):
     ALIASES = ["Robot"]
@@ -15,7 +19,7 @@ class ConnectionService(rpyc.Service):
     def on_disconnect(self):
         self.robot.stop()
         print("disconnected")
-
+        raise Stopped
 
     def exposed_put(self, commandIdentifier, value):
         self.robot.put(commandIdentifier, value)
@@ -23,16 +27,31 @@ class ConnectionService(rpyc.Service):
     def exposed_get(self):
         return self.robot.get()
 
+    def exposed_empty(self):
+        return self.robot.empty()
+
     def exposed_move(self, value):
-        self.robot.put(["move", value])
+        self.robot.move(value)
 
     def exposed_turn(self, value):
-        self.robot.put(["turn", value])
+        self.robot.turn(value)
 
     def exposed_scan(self, value):
-        self.robot.put(["scan", value])
+        self.robot.scan(value)
+
+    def exposed_clear(self):
+        self.robot.clear()
+
+    def exposed_close_server(self):
+        raise Stopped
 
 if __name__ == '__main__':
     print("Service on Port: ", _PORT, " started.")
-    Server(ConnectionService, port=_PORT).start()
-    print("Service stopped.")
+    try:
+        server = Server(ConnectionService, port=_PORT).start()
+    except Exception:
+        server.close()
+        print("Service stopped.")
+
+
+

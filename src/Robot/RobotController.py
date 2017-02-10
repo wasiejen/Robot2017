@@ -33,7 +33,10 @@ class RobotController(Thread):
 
         while True:
             scanDirection = None
-            commandIdentifier, value = self.getNextInstruction()
+            test = self.getNextInstruction()
+            print(test)
+            commandIdentifier, value = test
+
             if commandIdentifier == "move":
                 if value > 0:
                     self.setDirectionLF(1, 1)
@@ -71,7 +74,7 @@ class RobotController(Thread):
             movedSteps = self.moveAndScan(scanDirection)
 
             self._saveResult([commandIdentifier, movedSteps])
-            time.sleep(0.1)
+            # time.sleep(0.1)
 
     def getNextInstruction(self):
         return self._driveInstructions.get()
@@ -92,13 +95,14 @@ class RobotController(Thread):
     def moveAndScan(self, scanDirection):
 
         def moveScan():
+            # TODO: multipley spawnen von threads verhindern -> evtl ein dauerhafter thread
             while not self._motorQueue.empty():
-                distance = self.scanArray(returnSensorId=scanDirection)
+                distance = self.scanArray(scanDirection, returnSensorId=scanDirection)
                 if distance < self._MIN_DISTANCE:
                     self._motorQueue.clear()
                     self._saveResult([scanDirection, distance])
                     break
-                time.sleep(0.25)
+                time.sleep(1)
 
         if scanDirection:
             Thread(target=moveScan, name="moveScan").start()
@@ -137,15 +141,17 @@ class RobotController(Thread):
     def scanArray(self, scanDirections, returnSensorId=None):
 
         _TIMEOUT = 0.025
+        if type(scanDirections) is not list:
+            scanDirections = [scanDirections]
 
-        if scanDirections == "all":
+        if scanDirections == ["all"]:
             scanDirections = ["front", "back", "left", "right"]
 
         resultDict = {}
 
         for direction in scanDirections:
             resultDict[direction] = []
-            for i in range(10):
+            for i in range(6):
                 start_time = time.time()
                 distance = self._sensors[direction].getData(timeout=_TIMEOUT)
 

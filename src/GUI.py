@@ -4,7 +4,7 @@ import rpyc
 from threading import Thread
 import time
 
-VALUE = 4
+VALUE = 100
 
 
 class RobotGUI(QtWidgets.QMainWindow):
@@ -23,12 +23,12 @@ class RobotGUI(QtWidgets.QMainWindow):
 
         self.ui.move_forward.clicked.connect(self.move_forward)
         self.ui.move_forward.setAutoRepeat(True)
-        self.ui.move_forward.setAutoRepeatInterval(150)
+        self.ui.move_forward.setAutoRepeatInterval(50)
         self.ui.move_forward.setEnabled(False)
 
         self.ui.move_backwards.clicked.connect(self.move_backwards)
         self.ui.move_backwards.setAutoRepeat(True)
-        self.ui.move_backwards.setAutoRepeatInterval(150)
+        self.ui.move_backwards.setAutoRepeatInterval(50)
         self.ui.move_backwards.setEnabled(False)
 
         self.ui.turn_left.clicked.connect(self.turn_left)
@@ -86,16 +86,16 @@ class RobotGUI(QtWidgets.QMainWindow):
         self.ui.show_scannings.setEnabled(False)
 
     def move_forward(self):
-        self.robot.put("move", VALUE)
+        self.robot.put("move_forward", VALUE)
 
     def move_backwards(self):
-        self.robot.put("move", -VALUE)
+        self.robot.put("move_backward", VALUE)
 
     def turn_left(self):
-        self.robot.put("turn", VALUE)
+        self.robot.put("turn_left", VALUE)
 
     def turn_right(self):
-        self.robot.put("turn", -VALUE)
+        self.robot.put("turn_right", VALUE)
 
     def scan(self):
         self.robot.put("scan", "all")
@@ -105,24 +105,30 @@ class RobotGUI(QtWidgets.QMainWindow):
 
     def show_scannings(self):
 
-
-        dictLabels = {"move": self.ui.move,
-                      "left": self.ui.left,
-                      "right": self.ui.right,
-                      "front": self.ui.front,
-                      "back": self.ui.back,
-                      "turn": self.ui.turn}
-
-        # while not self.robot.empty():
-        #     identifier, value = self.robot.get(timeout=0.1)
-        #     dictLabels[identifier].setText(str(value))
+        dict_labels = {"move_forward": self.ui.move,
+                       "move_backward": self.ui.move,
+                       "turn_left": self.ui.turn,
+                       "turn_right": self.ui.turn,
+                       "moved_forward": self.ui.moved,
+                       "moved_backward": self.ui.moved,
+                       "turned_left": self.ui.turned,
+                       "turned_right": self.ui.turned,
+                       "left": self.ui.left,
+                       "right": self.ui.right,
+                       "front": self.ui.front,
+                       "back": self.ui.back,
+                       "turn": self.ui.turn,
+                       "scanned_at": self.ui.scanned_at,
+                       "limit_violated_by": self.ui.violated}
 
         def setlabels():
 
             while self.flag_scanning:
                 if not self.robot.empty():
                     identifier, value = self.robot.get()
-                    dictLabels[identifier].setText(str(int(value)))
+                    if type(value) == float:
+                        value = int(value)
+                    dict_labels[identifier].setText(str(value))
                 else:
                     time.sleep(0.05)
         self.stop_scanning()

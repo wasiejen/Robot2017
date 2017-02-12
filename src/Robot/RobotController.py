@@ -1,10 +1,34 @@
-from threading import Thread
+from threading import Thread, RLock
 import math
 import time
 
 
 class Stopped(Exception):
     pass
+
+
+class ObjectWithRLock(object):
+
+    _lock = RLock()
+
+    def __init__(self, value):
+        self._value = value
+
+    def set(self, value):
+        self._lock.acquire()
+        self._value = value
+        self._lock.release()
+
+    def get(self):
+        self._lock.acquire()
+        result = self._value
+        self._lock.release()
+        return result
+
+    def add(self, value):
+        self._lock.acquire()
+        self._value += value
+        self._lock.release()
 
 
 class RobotController(Thread):
@@ -17,74 +41,200 @@ class RobotController(Thread):
     _STEP_SIZE = 16
 
     _TIME_BETWEEN_STEPS = 1.3  # ms
-    _MIN_DISTANCE = 150  # mm
+    _MIN_DISTANCE = 120  # mm
 
-    def __init__(self, driveInstructions, motorQueue, actors, sensors, results):
+    _SCAN_TIMEOUT = 0.030
+
+    def __init__(self, drive_instructions, motor_queue, scan_queue, actors, sensors, results):
         Thread.__init__(self)
-        self._driveInstructions = driveInstructions
-        self._motorQueue = motorQueue
+        self._drive_instructions = drive_instructions
+        self._motor_queue = motor_queue
+        self._scan_queue = scan_queue
         self._actors = actors
         self._sensors = sensors
-        self._motorleft = actors["mleft"]
-        self._motorright = actors["mright"]
+        self._motor_left = actors["motor_left"]
+        self._motor_right = actors["motor_right"]
         self._results = results
+
+        self.scan_lock = RLock()
+        self._scan_process = Thread(target=self._scan_process_method, name="Scan-Thread")
+        # self._scan_process.daemon = True
+        self._movedSteps = ObjectWithRLock(0)
+
+    def _scan_process_method(self):
+
+        while True:
+            scan_directions, limit_directions = self._scan_queue.get()
+            scan_directions = self.check_if_all(scan_directions)
+            limit_directions = self.check_if_all(limit_directions)
+
+            # assert set(limit_directions).issubset(set(scan_directions))
+            self.scan_directions(scan_directions, limit_directions)
+            time.sleep(0.1)
+
+    def check_if_all(self, input):
+        if input == "all":
+            return ["front", "right", "back", "left"]
+        else:
+            return input
+
+    def scan_directions(self, scan_directions, limit_directions, return_violation=False):
+        scan_directions = self.check_if_all(scan_directions)
+        limit_directions = self.check_if_all(limit_directions)
+
+        result_dict = {}
+        for direction in scan_directions:
+            result_dict[direction] = self.scan(direction)
+
+        location = self._movedSteps.get()
+        if location != 0:
+            self._save_result(["scanned_at", location])
+        for direction in scan_directions:
+            self._save_result([direction, result_dict[direction]])
+
+        limit_violation_list = []
+        for direction in limit_directions:
+            if result_dict[direction] < self._MIN_DISTANCE:
+                limit_violation_list.append(direction)
+
+        if len(limit_violation_list) > 0:
+            self._save_result(["limit_violated_by", limit_violation_list])
+            self._motor_queue.clear()
+            # self._drive_instructions.clear()
+            return limit_directions
+
+    # TODO: testing to minimize result jumps
+    def scan(self, direction, scans=6, deviation_limit=40):
+        result_list = []
+        for i in range(scans):
+            start_time = time.time()
+
+            self.scan_lock.acquire()
+            distance = self._sensors[direction].getData(timeout=self._SCAN_TIMEOUT)
+            self.scan_lock.release()
+
+            if distance <= 0:
+                pass # TODO testing
+                # result_list.append(0)
+            elif distance > 3000:
+                result_list.append(3000)
+            else:
+                result_list.append(distance)
+            sleep_time = self._SCAN_TIMEOUT - (time.time() - start_time)
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+
+        # delete statistical outliers/extreme values if deviation is over certain treshold
+        while pstdev(result_list) > deviation_limit and len(result_list) > 2:
+
+            resultMean = mean(result_list)
+            temp = []
+            for el in result_list:
+                temp.append(abs(el - resultMean))
+            del result_list[temp.index(max(temp))]
+
+        resultMean = mean(result_list)
+        return resultMean
 
     def run(self):
 
+        drive_direction_mapping = {"move_forward": (1, 1),
+                             "move_backward": (-1, -1),
+                             "turn_left": (-1, 1),
+                             "turn_right": (1, -1)}
+
+        limit_direction_mapping = {"move_forward": ["front"],
+                             "move_backward": ["back"],
+                             "turn_left": [],
+                             "turn_right": []}
+
+        scan_direction_mapping = {"move_forward": ["left", "front", "right"],
+                             "move_backward": ["left", "back", "right"],
+                             "turn_left": [],
+                             "turn_right": []}
+
+        result_code_mapping = {"move_forward": "moved_forward",
+                             "move_backward": "moved_backward",
+                             "turn_left": "turned_left",
+                             "turn_right": "turned_right"}
+
+        step_mapping = {"move": self.getStepsForMM,
+                        "turn": self.getStepsForAngle}
+
+        next_command_identifier, next_value = None, None
+
+        self._scan_process.start()
+        self._scan_queue.put(["all", []])
+        time.sleep(1)
+
         while True:
-            scanDirection = None
-            test = self.getNextInstruction()
-            print(test)
-            commandIdentifier, value = test
 
-            if commandIdentifier == "move":
-                if value > 0:
-                    self.setDirectionLF(1, 1)
-                    scanDirection = "front"
-                else:
-                    self.setDirectionLF(-1, -1)
-                    scanDirection = "back"
-                steps = self.getStepsForCM(abs(value))
+            if next_command_identifier is None:
+                command_identifier, value = self.getNextInstruction()
+            else:
+                command_identifier = next_command_identifier
+                value = next_value
 
-            elif commandIdentifier == "turn":
-                if value > 0:
-                    self.setDirectionLF(-1, 1)
-                    # scanDirection = "right"
-                else:
-                    self.setDirectionLF(1, -1)
-                    # canDirection = "left"
-                steps = self.getStepsForAngle(abs(value))
+            if not self._drive_instructions.empty():
+                next_command_identifier, next_value = self.getNextInstruction()
+            else:
+                next_command_identifier, next_value = None, None
 
-            elif commandIdentifier == "stopThread":
+            # summing up the values of the same instructions
+            while next_command_identifier == command_identifier:
+                if type(value) in [int, float]:
+                    value += next_value
+                    if not self._drive_instructions.empty():
+                        next_command_identifier, next_value = self.getNextInstruction()
+                    else:
+                        # if there is no next command, empty variables for next command
+                        next_command_identifier, next_value = None, None
+                        break
+
+            general_command = command_identifier[0:4]
+
+            if general_command in ["move", "turn"]:
+                self._movedSteps.set(0)
+                self.setDirectionLF(drive_direction_mapping[command_identifier])
+                scan_directions = scan_direction_mapping[command_identifier]
+                limit_directions = limit_direction_mapping[command_identifier]
+                steps = step_mapping[general_command](value)
+
+                self._save_result([command_identifier, steps])
+
+                # check if no limits are violated, and if continue with next instruction
+                violated_limits = self.scan_directions(limit_directions, limit_directions, return_violation=True)
+                if not violated_limits:
+                    self.FillMotorQueue(steps)
+                    self.move(scan_directions, limit_directions)
+                self._save_result([result_code_mapping[command_identifier], self._movedSteps.get()])
+
+
+            elif command_identifier == "stopThread":
                 print("MotorControllerThread stopping")
                 raise Stopped
 
-            elif commandIdentifier == "scan":
-                self.scanArray(value)
-                continue
+            elif command_identifier == "scan":
+                self._scan_queue.put([value, []])
 
-            # filling the motorQueue with cycles of steps
-            self._motorQueue.clear()
-            cycles = [self._STEP_SIZE] * int(steps / self._STEP_SIZE)
-            cycles.append(steps % self._STEP_SIZE)  # append rest
-
-            for cycle in cycles:
-                self._motorQueue.put_nowait(cycle)
-
-            movedSteps = self.moveAndScan(scanDirection)
-
-            self._saveResult([commandIdentifier, movedSteps])
-            # time.sleep(0.1)
 
     def getNextInstruction(self):
-        return self._driveInstructions.get()
+        return self._drive_instructions.get()
 
+    def FillMotorQueue(self, steps):
+        # filling the motorQueue with cycles of steps
+        self._motor_queue.clear()
+        cycles = [self._STEP_SIZE] * int(steps / self._STEP_SIZE)
+        cycles.append(steps % self._STEP_SIZE)  # append rest
 
-    def _saveResult(self, result):
+        for cycle in cycles:
+            self._motor_queue.put_nowait(cycle)
+
+    def _save_result(self, result):
         print("Robot: ", result)
         self._results.put(result)
 
-    def getStepsForCM(self, value):
+    def getStepsForMM(self, value):
         result = value / (math.pi * self._WHEEL_DIAMETER / self._STEPS_PER_ROTATION)
         return int(result)
 
@@ -92,100 +242,37 @@ class RobotController(Thread):
         result = value * (math.pi * self._DISTANCE_BETWEEN_WHEELS / 360) / (math.pi * self._WHEEL_DIAMETER / self._STEPS_PER_ROTATION)
         return int(result)
 
-    def moveAndScan(self, scanDirection):
-
-        def moveScan():
-            # TODO: multipley spawnen von threads verhindern -> evtl ein dauerhafter thread
-            while not self._motorQueue.empty():
-                distance = self.scanArray(scanDirection, returnSensorId=scanDirection)
-                if distance < self._MIN_DISTANCE:
-                    self._motorQueue.clear()
-                    self._saveResult([scanDirection, distance])
-                    break
-                time.sleep(1)
-
-        if scanDirection:
-            Thread(target=moveScan, name="moveScan").start()
-        return self.move()
-
-
-    def move(self):
-        movedSteps = 0
-        while not self._motorQueue.empty():
-            steps = self._motorQueue.get()
+    def move(self, scan_directions=[], limit_directions=[]):
+        self._movedSteps.set(0)
+        while not self._motor_queue.empty():
+            steps = self._motor_queue.get()
+            if scan_directions != [] and self._movedSteps.get() % (15 * self._STEP_SIZE) == 0:
+                self._scan_queue.put([scan_directions, limit_directions])
             tLeft = Thread(target=self._moveLeftMotor, name="tLeft", args=(steps, self._TIME_BETWEEN_STEPS))
             tRight = Thread(target=self._moveRightMotor, name="tRight", args=(steps, self._TIME_BETWEEN_STEPS))
             tLeft.start()
             tRight.start()
             tLeft.join()
             tRight.join()
-            movedSteps += steps
+            self._movedSteps.add(steps)
         self.stop()
-        return movedSteps
+        self._scan_queue.clear()
 
     def _moveLeftMotor(self, steps, waittime):
-        self._motorleft.moveSteps(steps, waittime)
+        self._motor_left.moveSteps(steps, waittime)
 
     def _moveRightMotor(self, steps, waittime):
-        self._motorright.moveSteps(steps, waittime)
+        self._motor_right.moveSteps(steps, waittime)
 
     def stop(self):
-        self._motorleft.stop()
-        self._motorright.stop()
+        self._motor_left.stop()
+        self._motor_right.stop()
 
-    def setDirectionLF(self, left, right):
-        self._motorleft.setStepDirection(left)
-        self._motorright.setStepDirection(right)
+    def setDirectionLF(self, dir_tuple):
+        left, right = dir_tuple
+        self._motor_left.setStepDirection(left)
+        self._motor_right.setStepDirection(right)
 
-
-    def scanArray(self, scanDirections, returnSensorId=None):
-
-        _TIMEOUT = 0.025
-        if type(scanDirections) is not list:
-            scanDirections = [scanDirections]
-
-        if scanDirections == ["all"]:
-            scanDirections = ["front", "back", "left", "right"]
-
-        resultDict = {}
-
-        for direction in scanDirections:
-            resultDict[direction] = []
-            for i in range(6):
-                start_time = time.time()
-                distance = self._sensors[direction].getData(timeout=_TIMEOUT)
-
-                if distance <= 0:
-                    resultDict[direction].append(0)
-                elif distance > 2550:
-                    resultDict[direction].append(2550)
-                else:
-                    resultDict[direction].append(distance)
-                sleep_time = _TIMEOUT - (time.time() - start_time)
-                if sleep_time > 0:
-                    time.sleep(sleep_time)
-
-        # sort out the biggest differences between mean and actual value
-        # until a certain treshold of std deviation is unterschritten
-
-        for direction in scanDirections:
-            results = resultDict[direction]
-
-            while pstdev(results) > 30 and len(results) > 2:
-
-                resultMean = mean(results)
-                temp = []
-                for el in results:
-                    temp.append(abs(el - resultMean))
-                del results[temp.index(max(temp))]
-
-            resultMean = mean(results)
-            resultDict[direction] = resultMean
-            self._saveResult([direction, resultMean])
-
-        # return the distance value for specific sensor if given
-        if  returnSensorId is not None:
-            return resultDict[returnSensorId]
 
 def mean(data):
     """Return the sample arithmetic mean of data."""

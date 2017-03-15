@@ -88,17 +88,23 @@ class UltraSonicSensor(ExternalSensor):
         GPIO.output(self.triggerPin, False)
 
     def measureTime(self, timeout):
-        starttime = time.time()
-        while (GPIO.input(self.answerPin) == False):
-            if time.time() - starttime > timeout:
+        # rebound for faster execution
+        actual_time = time.time
+        sleep = time.sleep
+        gpio_input = GPIO.input
+
+        start_time = actual_time()
+
+        while (gpio_input(self.answerPin) == False):
+            if actual_time() - start_time > timeout:
                 break
-            time.sleep(0.000005)
-        pulseStart = time.time()
-        while (GPIO.input(self.answerPin) == True):
-            if time.time() - starttime > timeout:
+            sleep(0.000008)
+        pulseStart = actual_time()
+        while (gpio_input(self.answerPin) == True):
+            if actual_time() - start_time > timeout:
                 break
-            time.sleep(0.000005)
-        pulseEnd = time.time()
+            sleep(0.000008)
+        pulseEnd = actual_time()
         return pulseEnd - pulseStart
 
     def _calculateDistanceInMM(self, duration):
@@ -116,16 +122,16 @@ class StepperMotor(ExternalActor):
     Steppermotor modeltype XXX
     """
 
-    _step_sequence = [[True, False, False, True],
-                      [True, False, False, False],
-                      [True, True, False, False],
-                      [False, True, False, False],
-                      [False, True, True, False],
-                      [False, False, True, False],
-                      [False, False, True, True],
-                      [False, False, False, True]]
+    _step_sequence = ((True, False, False, True),
+                        (True, False, False, False),
+                        (True, True, False, False),
+                        (False, True, False, False),
+                        (False, True, True, False),
+                        (False, False, True, False),
+                        (False, False, True, True),
+                        (False, False, False, True))
     _step_sequence_length = len(_step_sequence)
-    _stop_sequence = [False, False, False, False]
+    _stop_sequence = (False, False, False, False)
     _orientationDic = {True: -1, False: 1}
 
 
@@ -156,17 +162,16 @@ class StepperMotor(ExternalActor):
     def getStepSize(self):
         return self._stepSize
 
-    def _setOutputStates(self, sequence):
-        # print(sequence)
-        for i in range(self._pincount):
-            GPIO.output(self._pins[i], sequence[i])
-
     def moveAndStop(self, steps, waitMillisecBetweenSteps):
         self.moveSteps(steps, waitMillisecBetweenSteps)
         self.stop()
 
     def moveSteps(self, steps, waitMillisecBetweenSteps):
         WaitTime = waitMillisecBetweenSteps / float(1000)
+
+        sleep = time.sleep
+        output = GPIO.output
+        pins = self._pins
 
         if self._stepDirection > 0:
             start = self._actualStepNumber + self._stepSize
@@ -177,11 +182,12 @@ class StepperMotor(ExternalActor):
 
         for i in range(start, end, self._stepDirection * self._stepSize):
             self._actualStepNumber = i % self._step_sequence_length
-            self._setOutputStates(self._step_sequence[self._actualStepNumber])
-            time.sleep(WaitTime)
+            [output(x, y) for x, y in zip(pins, self._step_sequence[self._actualStepNumber])]
+            sleep(WaitTime)
 
     def stop(self):
-        self._setOutputStates(self._stop_sequence)
+        output = GPIO.output
+        [output(x, y) for x, y in zip(self._pins, self._stop_sequence)]
 
     def __str__(self):
         return self._name + ": used pins: " + str(self._pins) + " orientation: " + str(self._orientation)

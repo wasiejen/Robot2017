@@ -1,6 +1,6 @@
 # import DeviceStup as Device
 import Device as Device
-from queue import Queue
+from queue import Queue, Empty
 
 import RobotController
 
@@ -36,7 +36,7 @@ class Robot(object):
                                                                 self.actors,
                                                                 self.sensors,
                                                                 self.result_queue)
-        # self.robot_controller.daemon = True
+        self.robot_controller.daemon = True
 
 
     #   TODO: Position actualisation -> Aufgabe PC
@@ -49,10 +49,15 @@ class Robot(object):
         self.driveInstructions.put([commandIdentifier, value])
 
     def get(self):
-        return self.result_queue.get()
+        buffer = []
+        while True:
+            try:
+                buffer.append(self.result_queue.get(timeout=0.01))
+            except Empty:
+                break
+        return buffer
 
     def clear(self):
-        # if not self.driveInstructions.empty():
         self.driveInstructions.queue.clear()
         self.motor_queue.clear()
         self.scan_queue.clear()

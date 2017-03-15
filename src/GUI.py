@@ -4,7 +4,9 @@ import rpyc
 from threading import Thread
 import time
 
-VALUE = 100
+VALUE = 90
+
+# QtWidgets.QMainWindow.setUpdatesEnabled()
 
 
 class RobotGUI(QtWidgets.QMainWindow):
@@ -123,14 +125,31 @@ class RobotGUI(QtWidgets.QMainWindow):
 
         def setlabels():
 
+            sleep = time.sleep
+            empty = self.robot.empty
+
             while self.flag_scanning:
-                if not self.robot.empty():
-                    identifier, value = self.robot.get()
-                    if type(value) == float:
-                        value = int(value)
-                    dict_labels[identifier].setText(str(value))
-                else:
-                    time.sleep(0.05)
+
+                if not empty():
+                    buffer = self.robot.get()
+
+                    self.setUpdatesEnabled(False)
+
+                    for result in buffer:
+                        if len(result) > 2:
+                            identifier, value = result[2:4]
+                        else:
+                            identifier, value = result
+                        if type(value) == float:
+                            value = int(value)
+                        dict_labels[identifier].setText(str(value))
+
+                    self.setUpdatesEnabled(True)
+
+                    buffer = []
+
+                sleep(0.2)
+
         self.stop_scanning()
         self.flag_scanning = True
         Thread(target=setlabels).start()

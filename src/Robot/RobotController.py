@@ -38,9 +38,9 @@ class RobotController(Thread):
     _ANGLE_PER_ROTATION = 5.625 / 64
     _STEPS_PER_ROTATION = 4096
 
-    _STEP_SIZE = 16
+    _STEP_SIZE = 32
 
-    _TIME_BETWEEN_STEPS = 1.3  # ms
+    _TIME_BETWEEN_STEPS = 1.1  # ms
     _MIN_DISTANCE = 120  # mm
 
     _SCAN_TIMEOUT = 0.030
@@ -58,7 +58,7 @@ class RobotController(Thread):
 
         self.scan_lock = RLock()
         self._scan_process = Thread(target=self._scan_process_method, name="Scan-Thread")
-        # self._scan_process.daemon = True
+        self._scan_process.daemon = True
         self._movedSteps = ObjectWithRLock(0)
 
     def _scan_process_method(self):
@@ -73,34 +73,29 @@ class RobotController(Thread):
             time.sleep(0.1)
 
     def check_if_all(self, input):
-        if input == "all":
-            return ["front", "right", "back", "left"]
+        if input in  ["all", ["all"]]:
+            return ["left", "front", "back", "right"]
         else:
             return input
 
-    def scan_directions(self, scan_directions, limit_directions, return_violation=False):
+    def scan_directions(self, scan_directions, limit_directions):
         scan_directions = self.check_if_all(scan_directions)
         limit_directions = self.check_if_all(limit_directions)
 
         result_dict = {}
         for direction in scan_directions:
             result_dict[direction] = self.scan(direction)
-
-        location = self._movedSteps.get()
-        if location != 0:
-            self._save_result(["scanned_at", location])
-        for direction in scan_directions:
-            self._save_result([direction, result_dict[direction]])
+            #     TODO: adapt GUI scanning for changed saving
+            self._save_result(["scanned_at", self._movedSteps.get(), direction, result_dict[direction]])
 
         limit_violation_list = []
         for direction in limit_directions:
             if result_dict[direction] < self._MIN_DISTANCE:
                 limit_violation_list.append(direction)
-
         if len(limit_violation_list) > 0:
             self._save_result(["limit_violated_by", limit_violation_list])
             self._motor_queue.clear()
-            # self._drive_instructions.clear()
+            self._drive_instructions.clear()
             return limit_directions
 
     # TODO: testing to minimize result jumps
@@ -148,10 +143,10 @@ class RobotController(Thread):
                              "turn_left": [],
                              "turn_right": []}
 
-        scan_direction_mapping = {"move_forward": ["left", "front", "right"],
-                             "move_backward": ["left", "back", "right"],
-                             "turn_left": [],
-                             "turn_right": []}
+        scan_direction_mapping = {"move_forward": ["all"],
+                             "move_backward": ["all"],
+                             "turn_left": ["all"],
+                             "turn_right": ["all"]}
 
         result_code_mapping = {"move_forward": "moved_forward",
                              "move_backward": "moved_backward",
@@ -190,6 +185,8 @@ class RobotController(Thread):
                         # if there is no next command, empty variables for next command
                         next_command_identifier, next_value = None, None
                         break
+                else:
+                    break
 
             general_command = command_identifier[0:4]
 
@@ -203,12 +200,11 @@ class RobotController(Thread):
                 self._save_result([command_identifier, steps])
 
                 # check if no limits are violated, and if continue with next instruction
-                violated_limits = self.scan_directions(limit_directions, limit_directions, return_violation=True)
+                violated_limits = self.scan_directions(limit_directions, limit_directions)
                 if not violated_limits:
                     self.FillMotorQueue(steps)
                     self.move(scan_directions, limit_directions)
                 self._save_result([result_code_mapping[command_identifier], self._movedSteps.get()])
-
 
             elif command_identifier == "stopThread":
                 print("MotorControllerThread stopping")

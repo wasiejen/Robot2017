@@ -38,6 +38,10 @@ class Robot(object):
                                                                 self.result_queue)
         self.robot_controller.daemon = True
 
+        # testarea ################
+
+        self.camera = Device.RaspiCamera()
+
 
     #   TODO: Position actualisation -> Aufgabe PC
 

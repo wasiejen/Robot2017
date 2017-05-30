@@ -679,6 +679,19 @@
      <string>start scanning</string>
     </property>
    </widget>
+   <widget class="QPushButton" name="camera_prev">
+    <property name="geometry">
+     <rect>
+      <x>790</x>
+      <y>600</y>
+      <width>141</width>
+      <height>91</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>show camera preview</string>
+    </property>
+   </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">

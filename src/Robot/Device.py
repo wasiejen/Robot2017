@@ -232,3 +232,29 @@ class RaspiLED(InternalActor):
     def off(self):
         GPIO.output(16, GPIO.HIGH)
 
+class InternalSensor(InternalDevice):
+    def __init__(self):
+        self._name = "InternalSensor"
+
+    def __str__(self):
+        return self._name
+
+import picamera
+
+class RaspiCamera(InternalSensor):
+
+    def __init__(self):
+        super().__init__()
+        self.name = "RaspiCamera"
+        self.camera = picamera.PiCamera()
+
+    def start_preview(self):
+        self.camera.start_preview()
+
+    def stop_preview(self):
+        self.camera.stop_preview()
+
+    def test_preview(self):
+        self.start_preview()
+        time.sleep(5)
+        self.stop_preview()

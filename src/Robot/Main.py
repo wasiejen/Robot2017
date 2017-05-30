@@ -45,6 +45,9 @@ class ConnectionService(rpyc.Service):
     def exposed_close_server(self):
         raise Stopped
 
+    def exposed_test_camera(self):
+        self.robot.camera.test_preview()
+
 if __name__ == '__main__':
     print("Service on Port: ", _PORT, " started.")
     try:

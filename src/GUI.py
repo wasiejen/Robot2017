@@ -54,6 +54,9 @@ class RobotGUI(QtWidgets.QMainWindow):
         self.ui.show_scannings.setAutoRepeatInterval(100)
         self.ui.show_scannings.setEnabled(False)
 
+        self.ui.camera_prev.clicked.connect(self.cam_preview)
+        self.ui.camera_prev.setEnabled(False)
+
         self.ui.show()
 
 
@@ -71,6 +74,7 @@ class RobotGUI(QtWidgets.QMainWindow):
         self.ui.scan.setEnabled(True)
         self.ui.clear_robot.setEnabled(True)
         self.ui.show_scannings.setEnabled(True)
+        self.ui.camera_prev.setEnabled(True)
 
     def stop(self):
 
@@ -86,6 +90,7 @@ class RobotGUI(QtWidgets.QMainWindow):
         self.ui.scan.setEnabled(False)
         self.ui.clear_robot.setEnabled(False)
         self.ui.show_scannings.setEnabled(False)
+        self.ui.camera_prev.setEnabled(False)
 
     def move_forward(self):
         self.robot.put("move_forward", VALUE)
@@ -104,6 +109,9 @@ class RobotGUI(QtWidgets.QMainWindow):
 
     def clear(self):
         self.robot.clear()
+
+    def cam_preview(self):
+        self.robot.test_camera()
 
     def show_scannings(self):
 

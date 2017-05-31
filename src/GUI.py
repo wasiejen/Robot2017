@@ -1,8 +1,6 @@
-from PyQt5 import QtGui, QtWidgets, uic
+from PyQt5 import QtCore, QtWidgets, uic
 import sys
 import rpyc
-from threading import Thread
-import time
 
 VALUE = 90
 
@@ -50,14 +48,34 @@ class RobotGUI(QtWidgets.QMainWindow):
         self.ui.clear_robot.setEnabled(False)
 
         self.ui.show_scannings.clicked.connect(self.show_scannings)
-        self.ui.show_scannings.setAutoRepeat(True)
-        self.ui.show_scannings.setAutoRepeatInterval(100)
+        # self.ui.show_scannings.setAutoRepeat(True)
+        # self.ui.show_scannings.setAutoRepeatInterval(100)
         self.ui.show_scannings.setEnabled(False)
 
-        self.ui.camera_prev.clicked.connect(self.cam_preview)
+        # self.ui.camera_prev.clicked.connect(self.cam_preview)
         self.ui.camera_prev.setEnabled(False)
 
         self.ui.show()
+
+        self.dict_labels = {"move_forward": self.ui.move,
+                            "move_backward": self.ui.move,
+                            "turn_left": self.ui.turn,
+                            "turn_right": self.ui.turn,
+                            "moved_forward": self.ui.moved,
+                            "moved_backward": self.ui.moved,
+                            "turned_left": self.ui.turned,
+                            "turned_right": self.ui.turned,
+                            "left": self.ui.left,
+                            "right": self.ui.right,
+                            "front": self.ui.front,
+                            "back": self.ui.back,
+                            "turn": self.ui.turn,
+                            "scanned_at": self.ui.scanned_at,
+                            "limit_violated_by": self.ui.violated}
+
+        self.timer = QtCore.QTimer()
+        self.timer.timeout.connect(self.set_labels)
+        self.flag_scanning = False
 
 
     def start(self):
@@ -74,7 +92,7 @@ class RobotGUI(QtWidgets.QMainWindow):
         self.ui.scan.setEnabled(True)
         self.ui.clear_robot.setEnabled(True)
         self.ui.show_scannings.setEnabled(True)
-        self.ui.camera_prev.setEnabled(True)
+        # self.ui.camera_prev.setEnabled(True)
 
     def stop(self):
 
@@ -113,61 +131,29 @@ class RobotGUI(QtWidgets.QMainWindow):
     def cam_preview(self):
         self.robot.test_camera()
 
+    def set_labels(self):
+        if not self.robot.empty():
+            buffer = self.robot.get()
+            if len(buffer) > 10:
+                buffer = buffer[-10:0]
+            for result in buffer:
+                if len(result) > 2:
+                    identifier, value = result[2:4]
+                else:
+                    identifier, value = result
+                if type(value) == float:
+                    value = int(value)
+                self.dict_labels[identifier].setText(str(value))
+
     def show_scannings(self):
-
-        dict_labels = {"move_forward": self.ui.move,
-                       "move_backward": self.ui.move,
-                       "turn_left": self.ui.turn,
-                       "turn_right": self.ui.turn,
-                       "moved_forward": self.ui.moved,
-                       "moved_backward": self.ui.moved,
-                       "turned_left": self.ui.turned,
-                       "turned_right": self.ui.turned,
-                       "left": self.ui.left,
-                       "right": self.ui.right,
-                       "front": self.ui.front,
-                       "back": self.ui.back,
-                       "turn": self.ui.turn,
-                       "scanned_at": self.ui.scanned_at,
-                       "limit_violated_by": self.ui.violated}
-
-        def setlabels():
-
-            sleep = time.sleep
-            empty = self.robot.empty
-
-            while self.flag_scanning:
-
-                if not empty():
-                    buffer = self.robot.get()
-
-                    self.setUpdatesEnabled(False)
-
-                    for result in buffer:
-                        if len(result) > 2:
-                            identifier, value = result[2:4]
-                        else:
-                            identifier, value = result
-                        if type(value) == float:
-                            value = int(value)
-                        dict_labels[identifier].setText(str(value))
-
-                    self.setUpdatesEnabled(True)
-
-                    buffer = []
-
-                sleep(0.2)
-
-        self.stop_scanning()
-        self.flag_scanning = True
-        Thread(target=setlabels).start()
-
-        self.ui.show_scannings.setText("scanning")
-
-    def stop_scanning(self):
-        self.flag_scanning = False
-        self.ui.show_scannings.setText("start scanning")
-        time.sleep(0.1)
+        if self.flag_scanning:
+            self.timer.stop()
+            self.ui.show_scannings.setText("start scanning")
+            self.flag_scanning = False
+        else:
+            self.timer.start(200)
+            self.ui.show_scannings.setText("scanning")
+            self.flag_scanning = True
 
 
 if __name__ == "__main__":

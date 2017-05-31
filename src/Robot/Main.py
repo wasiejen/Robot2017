@@ -52,7 +52,7 @@ if __name__ == '__main__':
     print("Service on Port: ", _PORT, " started.")
     try:
         server = Server(ConnectionService, port=_PORT).start()
-    except Exception:
+    except Stopped:
         server.close()
         print("Service stopped.")
 

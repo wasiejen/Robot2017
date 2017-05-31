@@ -1,15 +1,16 @@
-from threading import Thread, RLock
+from threading import Thread, Lock
 import math
 import time
+import numpy
 
 
 class Stopped(Exception):
     pass
 
 
-class ObjectWithRLock(object):
+class ObjectWithLock(object):
 
-    _lock = RLock()
+    _lock = Lock()
 
     def __init__(self, value):
         self._value = value
@@ -56,10 +57,10 @@ class RobotController(Thread):
         self._motor_right = actors["motor_right"]
         self._results = results
 
-        self.scan_lock = RLock()
+        self.scan_lock = Lock()
         self._scan_process = Thread(target=self._scan_process_method, name="Scan-Thread")
         self._scan_process.daemon = True
-        self._movedSteps = ObjectWithRLock(0)
+        self._movedSteps = ObjectWithLock(0)
 
     def _scan_process_method(self):
 
@@ -67,7 +68,6 @@ class RobotController(Thread):
             scan_directions, limit_directions = self._scan_queue.get()
             scan_directions = self.check_if_all(scan_directions)
             limit_directions = self.check_if_all(limit_directions)
-
             # assert set(limit_directions).issubset(set(scan_directions))
             self.scan_directions(scan_directions, limit_directions)
             time.sleep(0.1)
@@ -85,7 +85,6 @@ class RobotController(Thread):
         result_dict = {}
         for direction in scan_directions:
             result_dict[direction] = self.scan(direction)
-            #     TODO: adapt GUI scanning for changed saving
             self._save_result(["scanned_at", self._movedSteps.get(), direction, result_dict[direction]])
 
         limit_violation_list = []
@@ -98,38 +97,26 @@ class RobotController(Thread):
             self._drive_instructions.clear()
             return limit_directions
 
-    # TODO: testing to minimize result jumps
-    def scan(self, direction, scans=6, deviation_limit=40):
+    def scan(self, direction, deviation_limit=50):
         result_list = []
-        for i in range(scans):
-            start_time = time.time()
-
-            self.scan_lock.acquire()
-            distance = self._sensors[direction].getData(timeout=self._SCAN_TIMEOUT)
-            self.scan_lock.release()
-
-            if distance <= 0:
-                pass # TODO testing
-                # result_list.append(0)
-            elif distance > 3000:
-                result_list.append(3000)
-            else:
+        while len(result_list) < 5:
+            distance = self._sensors["SonicArray"].scanAt(direction)
+            if distance:
                 result_list.append(distance)
-            sleep_time = self._SCAN_TIMEOUT - (time.time() - start_time)
-            if sleep_time > 0:
-                time.sleep(sleep_time)
+            if len(result_list) > 4:
+                if numpy.std(result_list) < deviation_limit:
+                    break
+                else:
+                    for i in range(2):
+                        mean = sum(result_list) / len(result_list)
+                        temp = []
+                        for el in result_list:
+                            temp.append(abs(el - mean))
+                        del result_list[temp.index(max(temp))]
+                if numpy.std(result_list) < deviation_limit:
+                    break
 
-        # delete statistical outliers/extreme values if deviation is over certain treshold
-        while pstdev(result_list) > deviation_limit and len(result_list) > 2:
-
-            resultMean = mean(result_list)
-            temp = []
-            for el in result_list:
-                temp.append(abs(el - resultMean))
-            del result_list[temp.index(max(temp))]
-
-        resultMean = mean(result_list)
-        return resultMean
+        return sum(result_list) / len(result_list)
 
     def run(self):
 
@@ -143,10 +130,10 @@ class RobotController(Thread):
                              "turn_left": [],
                              "turn_right": []}
 
-        scan_direction_mapping = {"move_forward": ["all"],
-                             "move_backward": ["all"],
-                             "turn_left": ["all"],
-                             "turn_right": ["all"]}
+        scan_direction_mapping = {"move_forward": ["front", "left", "right"],
+                             "move_backward": ["back", "left", "right"],
+                             "turn_left": [],
+                             "turn_right": []}
 
         result_code_mapping = {"move_forward": "moved_forward",
                              "move_backward": "moved_backward",
@@ -162,6 +149,7 @@ class RobotController(Thread):
         self._scan_queue.put(["all", []])
         time.sleep(1)
 
+        # TODO: running variable einfuehren
         while True:
 
             if next_command_identifier is None:
@@ -239,6 +227,7 @@ class RobotController(Thread):
         return int(result)
 
     def move(self, scan_directions=[], limit_directions=[]):
+        # TODO: auf Eventgesteuerte threads umschreiben :-D
         self._movedSteps.set(0)
         while not self._motor_queue.empty():
             steps = self._motor_queue.get()
@@ -269,29 +258,29 @@ class RobotController(Thread):
         self._motor_left.setStepDirection(left)
         self._motor_right.setStepDirection(right)
 
-
-def mean(data):
-    """Return the sample arithmetic mean of data."""
-    n = len(data)
-    if n < 1:
-        raise ValueError('mean requires at least one data point')
-    return sum(data) / n  # in Python 2 use sum(data)/float(n)
-
-def _ss(data):
-    """Return sum of square deviations of sequence data."""
-    c = mean(data)
-    ss = sum((x - c) ** 2 for x in data)
-    return ss
-
-def pstdev(data):
-    """Calculates the population standard deviation."""
-    n = len(data)
-    if n < 2:
-        raise ValueError('variance requires at least two data points')
-    ss = _ss(data)
-    pvar = ss / n  # the population variance
-    return pvar ** 0.5
-
+#
+# def mean(data):
+#     """Return the sample arithmetic mean of data."""
+#     n = len(data)
+#     if n < 1:
+#         raise ValueError('mean requires at least one data point')
+#     return sum(data) / n  # in Python 2 use sum(data)/float(n)
+#
+# def _ss(data):
+#     """Return sum of square deviations of sequence data."""
+#     c = mean(data)
+#     ss = sum((x - c) ** 2 for x in data)
+#     return ss
+#
+# def pstdev(data):
+#     """Calculates the population standard deviation."""
+#     n = len(data)
+#     if n < 2:
+#         raise ValueError('variance requires at least two data points')
+#     ss = _ss(data)
+#     pvar = ss / n  # the population variance
+#     return pvar ** 0.5
+#
 
 # class QueueThread(Thread):
 #

@@ -8,7 +8,8 @@ import RobotController
 class ClearableQueue(Queue):
 
     def clear(self):
-        self.queue.clear()
+        while not self.empty():
+            self.get()
 
 
 class Robot(object):
@@ -22,10 +23,7 @@ class Robot(object):
         self.motor_queue = ClearableQueue()
         self.scan_queue = ClearableQueue()
 
-        self.sensors = {"front": Device.UltraSonicSensor(23, 27),
-                        "right": Device.UltraSonicSensor(15, 27),
-                        "left": Device.UltraSonicSensor(17, 27),
-                        "back": Device.UltraSonicSensor(18, 27),
+        self.sensors = {"SonicArray": Device.UltraSonicArray4Way([23, 15, 17, 18], 27),
                         "RaspiLED": Device.RaspiLED()}
 
         self.result_queue = Queue()
@@ -40,7 +38,7 @@ class Robot(object):
 
         # testarea ################
 
-        self.camera = Device.RaspiCamera()
+        # self.camera = Device.RaspiCamera()
 
 
     #   TODO: Position actualisation -> Aufgabe PC

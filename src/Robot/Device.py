@@ -5,6 +5,8 @@
 import RPi.GPIO as GPIO
 import time
 
+from collections import deque
+
 # Needs to be BCM. GPIO.BOARD lets you address GPIO ports by periperal
 # connector pin number, and the LED GPIO isn't on the connector
 GPIO.setmode(GPIO.BCM)
@@ -56,6 +58,63 @@ class ExternalSensor(ExternalDevice):
         raise NotImplementedError("Please Implement this method: getdata")
 
 
+class UltraSonicArray4Way():
+
+    WAITTIME = 0.035
+
+    def __init__(self, triggerPins, answerPin):
+        self.triggerPins = triggerPins
+        self.answerPin = answerPin
+        self.queue = deque(maxlen=5)
+
+        front, right, left, back = self.triggerPins
+
+        self.sensors = {"front": UltraSonicSensor(front, self.answerPin),
+                        "right": UltraSonicSensor(right, self.answerPin),
+                        "left": UltraSonicSensor(left, self.answerPin),
+                        "back": UltraSonicSensor(back, self.answerPin)}
+
+        GPIO.remove_event_detect(self.answerPin)
+        GPIO.add_event_detect(self.answerPin, GPIO.BOTH, callback=self.both)
+
+    def both(self, pin):
+        self.queue.append(time.time())
+        # if GPIO.input(self.answerPin) == 1:
+        #     self.queue.put(("start", act_time))
+        # else:
+        #     self.queue.put(("end", act_time))
+
+    def scan(self, positions):
+        '''
+        scan one or multiple positions and returns the distance
+        :param positions: str oder list[str]
+        :return: list[float]
+        '''
+        result = []
+        for position in positions:
+            distance = self.scanAt(position)
+            result.append(distance)
+        return result
+
+    def scanAt(self, position):
+        self.sensors[position].sendTriggerImpuls()
+        time.sleep(self.WAITTIME)
+        try:
+            end = self.queue.pop()
+            start = self.queue.pop()
+        except IndexError as e:
+            return 0
+        # if len(self.queue):
+        #     print(self.queue.pop())
+        return self._calculateDistanceInMM(end - start)
+
+
+    def _calculateDistanceInMM(self, duration):
+        # speed of sound at sealevel 343000 mm/s
+        # distance = duration / 2 * speed
+        return 171500 * duration
+
+
 class UltraSonicSensor(ExternalSensor):
 
     def __init__(self, triggerPin, answerPin):
@@ -67,45 +126,39 @@ class UltraSonicSensor(ExternalSensor):
         GPIO.setup(answerPin, GPIO.IN)
 
         GPIO.output(triggerPin, False)
-
         self._name = "UltraSonicSensor"
 
-    def getData(self, timeout=0.20):
+    def getData(self):
         self.sendTriggerImpuls()
-        duration = self.measureTime(timeout)
+        duration = self.measureTime()
         return self._calculateDistanceInMM(duration)
 
     def sendTriggerImpuls(self):
         # 10 us impuls starts 8 bursts at 40 kHz
-        self.startTrigger()
-        time.sleep(0.00001)
-        self.stopTrigger()
-
-    def startTrigger(self):
         GPIO.output(self.triggerPin, True)
-
-    def stopTrigger(self):
+        # tested ... time.sleep is not needed
+        # time.sleep(0.000001)
         GPIO.output(self.triggerPin, False)
 
     def measureTime(self, timeout):
-        # rebound for faster execution
-        actual_time = time.time
-        sleep = time.sleep
-        gpio_input = GPIO.input
 
-        start_time = actual_time()
-
-        while (gpio_input(self.answerPin) == False):
-            if actual_time() - start_time > timeout:
-                break
-            sleep(0.000008)
-        pulseStart = actual_time()
-        while (gpio_input(self.answerPin) == True):
-            if actual_time() - start_time > timeout:
-                break
-            sleep(0.000008)
-        pulseEnd = actual_time()
+        GPIO.wait_for_edge(self.answerPin, GPIO.BOTH, timeout=0.015)
+        pulseStart = time.time()
+        GPIO.wait_for_edge(self.answerPin, GPIO.BOTH, timeout=0.03)
+        pulseEnd = time.time()
         return pulseEnd - pulseStart
+
+        # while (gpio_input(self.answerPin) == False):
+        #     if actual_time() - start_time > timeout:
+        #         break
+        #     sleep(0.000008)
+        # pulseStart = actual_time()
+        # while (gpio_input(self.answerPin) == True):
+        #     if actual_time() - start_time > timeout:
+        #         break
+        #     sleep(0.000008)
+        # pulseEnd = actual_time()
+        # return pulseEnd - pulseStart
 
     def _calculateDistanceInMM(self, duration):
         # speed of sound at sealevel 343000 mm/s
@@ -167,7 +220,7 @@ class StepperMotor(ExternalActor):
         self.stop()
 
     def moveSteps(self, steps, waitMillisecBetweenSteps):
-        WaitTime = waitMillisecBetweenSteps / float(1000)
+        WaitTime = waitMillisecBetweenSteps / 1000.
 
         sleep = time.sleep
         output = GPIO.output

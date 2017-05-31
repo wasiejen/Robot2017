@@ -65,7 +65,7 @@ class UltraSonicArray4Way():
     def __init__(self, triggerPins, answerPin):
         self.triggerPins = triggerPins
         self.answerPin = answerPin
-        self.queue = deque(maxlen=5)
+        self.queue = deque(maxlen=2)
 
         front, right, left, back = self.triggerPins
 
@@ -102,8 +102,9 @@ class UltraSonicArray4Way():
         try:
             end = self.queue.pop()
             start = self.queue.pop()
+        # that exception is only happening of there is no echo in time -> distance to big
         except IndexError as e:
-            return 0
+            return 3000  # results out of the waittime of 0.035 s (~12 m / 4 -> sound travel time + time response)
         # if len(self.queue):
         #     print(self.queue.pop())
         return self._calculateDistanceInMM(end - start)

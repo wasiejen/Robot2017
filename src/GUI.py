@@ -108,7 +108,7 @@ class RobotGUI(QtWidgets.QMainWindow):
         self.ui.scan.setEnabled(False)
         self.ui.clear_robot.setEnabled(False)
         self.ui.show_scannings.setEnabled(False)
-        self.ui.camera_prev.setEnabled(False)
+        # self.ui.camera_prev.setEnabled(False)
 
     def move_forward(self):
         self.robot.put("move_forward", VALUE)
@@ -154,6 +154,11 @@ class RobotGUI(QtWidgets.QMainWindow):
             self.timer.start(200)
             self.ui.show_scannings.setText("scanning")
             self.flag_scanning = True
+
+    def stop_scanning(self):
+        self.timer.stop()
+        self.ui.show_scannings.setText("start scanning")
+        self.flag_scanning = False
 
 
 if __name__ == "__main__":

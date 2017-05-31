@@ -1,15 +1,10 @@
 # import DeviceStup as Device
 import Device as Device
 from queue import Queue, Empty
+from HelpClasses import ClearableQueue
 
 import RobotController
 
-
-class ClearableQueue(Queue):
-
-    def clear(self):
-        while not self.empty():
-            self.get()
 
 
 class Robot(object):

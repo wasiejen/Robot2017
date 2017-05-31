@@ -1,35 +1,8 @@
-from threading import Thread, Lock
+from threading import Thread, Event
+from HelpClasses import ClearableQueue, ObjectWithLock
 import math
 import time
 import numpy
-
-
-class Stopped(Exception):
-    pass
-
-
-class ObjectWithLock(object):
-
-    _lock = Lock()
-
-    def __init__(self, value):
-        self._value = value
-
-    def set(self, value):
-        self._lock.acquire()
-        self._value = value
-        self._lock.release()
-
-    def get(self):
-        self._lock.acquire()
-        result = self._value
-        self._lock.release()
-        return result
-
-    def add(self, value):
-        self._lock.acquire()
-        self._value += value
-        self._lock.release()
 
 
 class RobotController(Thread):
@@ -39,10 +12,11 @@ class RobotController(Thread):
     _ANGLE_PER_ROTATION = 5.625 / 64
     _STEPS_PER_ROTATION = 4096
 
-    _STEP_SIZE = 32
+    # _STEP_SIZE = 32
+    _STEP_SIZE = 16
 
     _TIME_BETWEEN_STEPS = 1.1  # ms
-    _MIN_DISTANCE = 120  # mm
+    _MIN_DISTANCE = 180  # mm
 
     _SCAN_TIMEOUT = 0.030
 
@@ -57,10 +31,28 @@ class RobotController(Thread):
         self._motor_right = actors["motor_right"]
         self._results = results
 
-        self.scan_lock = Lock()
         self._scan_process = Thread(target=self._scan_process_method, name="Scan-Thread")
         self._scan_process.daemon = True
-        self._movedSteps = ObjectWithLock(0)
+        self._movedStepsCounter = ObjectWithLock(0)
+
+        self.queue_left = ClearableQueue()
+        self.queue_right = ClearableQueue()
+        self.motor_start_event = Event()
+        self.motor_left_rdy = Event()
+        self.motor_right_rdy = Event()
+
+        # setup_left = [self._motor_left, self.queue_left, self._TIME_BETWEEN_STEPS, self.motor_start_event, self.motor_left_rdy]
+        # setup_right = [self._motor_right, self.queue_right, self._TIME_BETWEEN_STEPS, self.motor_start_event, self.motor_right_rdy]
+
+        self.motor_thread_left = Thread(target=self._moveMotor,
+                                        args=(self._motor_left, self.queue_left, self._TIME_BETWEEN_STEPS,
+                                              self.motor_start_event, self.motor_left_rdy),
+                                        daemon=True)
+
+        self.motor_thread_right = Thread(target=self._moveMotor,
+                                         args=(self._motor_right, self.queue_right, self._TIME_BETWEEN_STEPS,
+                                               self.motor_start_event, self.motor_right_rdy),
+                                         daemon=True)
 
     def _scan_process_method(self):
 
@@ -85,7 +77,7 @@ class RobotController(Thread):
         result_dict = {}
         for direction in scan_directions:
             result_dict[direction] = self.scan(direction)
-            self._save_result(["scanned_at", self._movedSteps.get(), direction, result_dict[direction]])
+            self._save_result(["scanned_at", self._movedStepsCounter.get(), direction, result_dict[direction]])
 
         limit_violation_list = []
         for direction in limit_directions:
@@ -97,28 +89,34 @@ class RobotController(Thread):
             self._drive_instructions.clear()
             return limit_directions
 
-    def scan(self, direction, deviation_limit=50):
+    def scan(self, direction, deviation_limit=0.05):
         result_list = []
         while len(result_list) < 5:
             distance = self._sensors["SonicArray"].scanAt(direction)
+            if distance > 3000:
+                distance = 3000.
             if distance:
                 result_list.append(distance)
             if len(result_list) > 4:
-                if numpy.std(result_list) < deviation_limit:
+                mean = sum(result_list) / len(result_list)
+                if numpy.std(result_list) < (mean * deviation_limit):
                     break
                 else:
                     for i in range(2):
-                        mean = sum(result_list) / len(result_list)
                         temp = []
                         for el in result_list:
                             temp.append(abs(el - mean))
                         del result_list[temp.index(max(temp))]
-                if numpy.std(result_list) < deviation_limit:
+                        mean = sum(result_list) / len(result_list)
+                if numpy.std(result_list) < (mean * deviation_limit):
                     break
 
-        return sum(result_list) / len(result_list)
+        return int(sum(result_list) / len(result_list))
 
     def run(self):
+        self.running = True
+        self.motor_thread_left.start()
+        self.motor_thread_right.start()
 
         drive_direction_mapping = {"move_forward": (1, 1),
                              "move_backward": (-1, -1),
@@ -149,8 +147,7 @@ class RobotController(Thread):
         self._scan_queue.put(["all", []])
         time.sleep(1)
 
-        # TODO: running variable einfuehren
-        while True:
+        while self.running:
 
             if next_command_identifier is None:
                 command_identifier, value = self.getNextInstruction()
@@ -179,7 +176,7 @@ class RobotController(Thread):
             general_command = command_identifier[0:4]
 
             if general_command in ["move", "turn"]:
-                self._movedSteps.set(0)
+                self._movedStepsCounter.set(0)
                 self.setDirectionLF(drive_direction_mapping[command_identifier])
                 scan_directions = scan_direction_mapping[command_identifier]
                 limit_directions = limit_direction_mapping[command_identifier]
@@ -192,11 +189,11 @@ class RobotController(Thread):
                 if not violated_limits:
                     self.FillMotorQueue(steps)
                     self.move(scan_directions, limit_directions)
-                self._save_result([result_code_mapping[command_identifier], self._movedSteps.get()])
+                self._save_result([result_code_mapping[command_identifier], self._movedStepsCounter.get()])
 
             elif command_identifier == "stopThread":
                 print("MotorControllerThread stopping")
-                raise Stopped
+                self.running = False
 
             elif command_identifier == "scan":
                 self._scan_queue.put([value, []])
@@ -209,7 +206,9 @@ class RobotController(Thread):
         # filling the motorQueue with cycles of steps
         self._motor_queue.clear()
         cycles = [self._STEP_SIZE] * int(steps / self._STEP_SIZE)
-        cycles.append(steps % self._STEP_SIZE)  # append rest
+        rest = steps % self._STEP_SIZE
+        if rest > 0:
+            cycles.append(rest)  # append rest
 
         for cycle in cycles:
             self._motor_queue.put_nowait(cycle)
@@ -227,27 +226,35 @@ class RobotController(Thread):
         return int(result)
 
     def move(self, scan_directions=[], limit_directions=[]):
-        # TODO: auf Eventgesteuerte threads umschreiben :-D
-        self._movedSteps.set(0)
+        self._movedStepsCounter.set(0)
         while not self._motor_queue.empty():
             steps = self._motor_queue.get()
-            if scan_directions != [] and self._movedSteps.get() % (15 * self._STEP_SIZE) == 0:
-                self._scan_queue.put([scan_directions, limit_directions])
-            tLeft = Thread(target=self._moveLeftMotor, name="tLeft", args=(steps, self._TIME_BETWEEN_STEPS))
-            tRight = Thread(target=self._moveRightMotor, name="tRight", args=(steps, self._TIME_BETWEEN_STEPS))
-            tLeft.start()
-            tRight.start()
-            tLeft.join()
-            tRight.join()
-            self._movedSteps.add(steps)
+            # fill queues for motor threads
+            self.queue_left.put(steps)
+            self.queue_right.put(steps)
+            # signal threads to start
+            self.motor_start_event.set()
+            # maybe waittime needed before reseting event -> yep it is or else there will be lost steps
+            time.sleep(0.001)
+            self.motor_start_event.clear()
+            # scanning while driving (put between clear and wait to reduce delay)
+            if scan_directions != []:
+                if self._movedStepsCounter.get() % (15 * self._STEP_SIZE) == 0:
+                    self._scan_queue.put([scan_directions, limit_directions])
+            # wait for events of motor_threads to be ready to start new round
+            self.motor_left_rdy.wait()
+            self.motor_right_rdy.wait()
+            self._movedStepsCounter.add(steps)
         self.stop()
         self._scan_queue.clear()
 
-    def _moveLeftMotor(self, steps, waittime):
-        self._motor_left.moveSteps(steps, waittime)
-
-    def _moveRightMotor(self, steps, waittime):
-        self._motor_right.moveSteps(steps, waittime)
+    def _moveMotor(self, motor, queue, waittime, start_event, rdy_event):
+        while self.running:
+            start_event.wait()
+            rdy_event.clear()
+            steps = queue.get()
+            motor.moveSteps(steps, waittime)
+            rdy_event.set()
 
     def stop(self):
         self._motor_left.stop()
